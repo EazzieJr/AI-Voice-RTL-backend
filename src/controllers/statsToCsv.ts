@@ -1,5 +1,5 @@
 import { createObjectCsvWriter } from "csv-writer";
-import { contactModel } from "../contacts/contact_model";
+import { contactModel } from "../models/contact_model";
 import path from "path";
 
 export const statsToCsv = async (
@@ -67,7 +67,6 @@ export const statsToCsv = async (
         { id: "last_date_called", title: "last_date_called" },
       ],
     });
-    
 
     await csvWriter.writeRecords(contactsData);
     console.log("CSV file stats.csv has been written successfully");

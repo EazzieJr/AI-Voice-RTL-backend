@@ -15,7 +15,7 @@ import {
   updateContactAndTranscript,
   updateContactAndTranscriptForClient,
   updateOneContact,
-} from "./contacts/contact_controller";
+} from "./controllers/contact_controller";
 
 import csv from "csv-parser";
 
@@ -24,7 +24,7 @@ import {
   contactModel,
   jobModel,
   EventModel,
-} from "./contacts/contact_model";
+} from "./models/contact_model";
 import axios from "axios";
 import argon2 from "argon2";
 // import { TwilioClient } from "./twilio_api";
@@ -44,14 +44,14 @@ import moment from "moment-timezone";
 import schedule from "node-schedule";
 import path from "path";
 import SmeeClient from "smee-client";
-import { DailyStatsModel } from "./contacts/call_log";
-import { logsToCsv } from "./LOGS-FUCNTION/logsToCsv";
-import { statsToCsv } from "./LOGS-FUCNTION/statsToCsv";
-import { scheduleCronJob } from "./Schedule-Fuctions/scheduleJob";
+import { DailyStatsModel } from "./models/logModel";
+import { logsToCsv } from "./controllers/adminExportToCsv";
+import { statsToCsv } from "./controllers/statsToCsv";
+import { scheduleCronJob } from "./controllers/scheduleJob";
 import OpenAI from "openai";
 import jwt from "jsonwebtoken";
 import { redisConnection } from "./utils/redis";
-import { userModel } from "./users/userModel";
+import { userModel } from "./models/userModel";
 import authmiddleware from "./middleware/protect";
 import { isAdmin } from "./middleware/isAdmin";
 import { google } from "googleapis";
@@ -62,9 +62,9 @@ import {
   getAllSchedulesWithAvailabilityId,
   getUserId,
   scheduleMeeting,
-} from "./helper-fuction/zoom";
-import callHistoryModel from "./contacts/history_model";
-import { formatPhoneNumber } from "./helper-fuction/formatter";
+} from "./utils/zoom";
+import callHistoryModel from "./models/historyModel";
+import { formatPhoneNumber } from "./utils/formatter";
 
 import {
   getAllLLM,
@@ -74,15 +74,12 @@ import {
   updateAgent,
   updateLLM,
 } from "./LLM/llm-fuctions";
-import { dailyGraphModel } from "./Schedule-Fuctions/graphModel";
-import { updateStatsByHour } from "./Schedule-Fuctions/graphController";
+import { dailyGraphModel } from "./models/graphModel";
+import { updateStatsByHour } from "./controllers/graphController";
 import { DateTime } from "luxon";
-import {
-  reviewCallback,
-  reviewTranscript,
-} from "./helper-fuction/transcript-review";
+import { reviewCallback, reviewTranscript } from "./utils/transcript-review";
 import { stat } from "fs/promises";
-import { script } from "./script";
+import { script } from "./utils/script";
 
 connectDb();
 // const smee = new SmeeClient({
@@ -893,22 +890,20 @@ export class Server {
           agentName: agentNameEnum,
           date: todayString,
           address: retell_llm_dynamic_variables?.user_address || null,
-          dial_status: callStatus
-          
+          dial_status: callStatus,
         };
         await callHistoryModel.findOneAndUpdate(
           { callId: call_id, agentId: agent_id },
           { $set: callData },
           { upsert: true, returnOriginal: false },
-
         );
         const jobidfromretell = retell_llm_dynamic_variables.job_id
           ? retell_llm_dynamic_variables.job_id
           : null;
-         // const resultforcheck = await contactModel.findOne({callId: payload.call.call_id, agentId: payload.call.agent_id})
-          let statsResults
-       // if(resultforcheck.calledTimes < 0){
-         statsResults = await DailyStatsModel.findOneAndUpdate(
+        // const resultforcheck = await contactModel.findOne({callId: payload.call.call_id, agentId: payload.call.agent_id})
+        let statsResults;
+        // if(resultforcheck.calledTimes < 0){
+        statsResults = await DailyStatsModel.findOneAndUpdate(
           {
             day: todayString,
             agentId: agent_id,
@@ -916,10 +911,10 @@ export class Server {
           },
           statsUpdate,
           { upsert: true, returnOriginal: false },
-        )
+        );
         const timestamp = new Date();
         await updateStatsByHour(agent_id, todayString, timestamp);
-     // }
+        // }
 
         //const linkToCallLogModelId = statsResults ? statsResults._id : null;
         const updateData: any = {
@@ -929,19 +924,17 @@ export class Server {
           timesCalled: time,
           $inc: { calledTimes: 1 },
         };
-        
+
         // Conditionally include linkToCallLogModel if it exists
         if (statsResults) {
           updateData.linktocallLogModel = statsResults._id;
         }
-        
+
         const resultForUserUpdate = await contactModel.findOneAndUpdate(
           { callId: call_id, agentId: payload.call.agent_id },
           updateData,
         );
-        
 
-        
         // if (analyzedTranscript.message.content === "Scheduled") {
         //   const data = {
         //     firstname: resultForUserUpdate.firstname,
@@ -973,168 +966,6 @@ export class Server {
       console.error("Error in handleCallAnalyyzedOrEnded:", error);
     }
   }
-
-  // async handleCallEnded(
-  //   payload: any,
-  //   todayString: string,
-  //   todaysDateForDatesCalled: string,
-  //   time: number,
-  // ) {
-  //   try {
-  //     const {
-  //       call_id,
-  //       agent_id,
-  //       disconnection_reason,
-  //       start_timestamp,
-  //       end_timestamp,
-  //       transcript,
-  //       recording_url,
-  //       public_log_url,
-  //       retell_llm_dynamic_variables = {},
-  //       call_analysis,
-  //       call_status,
-  //       from_number,
-  //       to_number,
-  //       direction,
-  //     } = payload.data;
-  
-  //     // Helper Functions
-  //     const convertMsToHourMinSec = (ms: number): string => {
-  //       const totalSeconds = Math.floor(ms / 1000);
-  //       const hours = Math.floor(totalSeconds / 3600);
-  //       const minutes = Math.floor((totalSeconds % 3600) / 60);
-  //       const seconds = totalSeconds % 60;
-  //       return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  //     };
-  
-  //     const getAgentNameEnum = (agentId: string): string => {
-  //       const agentMap: Record<string, string> = {
-  //         agent_1852d8aa89c3999f70ecba92b8: "ARS",
-  //         agent_6beffabb9adf0ef5bbab8e0bb2: "LQR",
-  //         agent_155d747175559aa33eee83a976: "SDR",
-  //         "214e92da684138edf44368d371da764c": "TVAG",
-  //       };
-  //       return agentMap[agentId] || "UNKNOWN";
-  //     };
-  
-  //     const updateStatsForCallStatus = (reason: string, statsUpdate: any) => {
-  //       const callStatusMap: Record<string, { statKey: string; status: string }> = {
-  //         dial_failed: { statKey: "totalFailed", status: callstatusenum.FAILED },
-  //         call_transfer: { statKey: "totalTransferred", status: callstatusenum.TRANSFERRED },
-  //         dial_no_answer: { statKey: "totalDialNoAnswer", status: callstatusenum.NO_ANSWER },
-  //         inactivity: { statKey: "totalCallInactivity", status: callstatusenum.INACTIVITY },
-  //         user_hangup: { statKey: "totalCallAnswered", status: callstatusenum.CALLED },
-  //         agent_hangup: { statKey: "totalCallAnswered", status: callstatusenum.CALLED },
-  //       };
-  //       const match = callStatusMap[reason];
-  //       if (match) {
-  //         statsUpdate.$inc[match.statKey] = 1;
-  //         return match.status;
-  //       }
-  //       return null;
-  //     };
-  
-  //     // Initialize variables
-  //     const agentNameEnum = getAgentNameEnum(agent_id);
-  //     let statsUpdate: any = { $inc: { totalCalls: 1, totalCallDuration: payload.call.duration_ms } };
-  
-  //     // Review transcript and determine statuses
-  //     const analyzedTranscriptForStatus = await reviewTranscript(transcript);
-  //     const callStatus = updateStatsForCallStatus(disconnection_reason, statsUpdate);
-  
-  //     if (analyzedTranscriptForStatus.message.content === "scheduled") {
-  //       statsUpdate.$inc.totalAppointment = 1;
-  //     } else if (analyzedTranscriptForStatus.message.content === "voicemail") {
-  //       statsUpdate.$inc.totalAnsweredByVm = 1;
-  //     } else if (analyzedTranscriptForStatus.message.content === "ivr") {
-  //       statsUpdate.$inc.totalAnsweredByIVR = 1;
-  //     }
-  
-  //     const callbackDate = await reviewCallback(transcript);
-  //     const newDuration = convertMsToHourMinSec(payload.call.duration_ms);
-  
-  //     // EventModel Update
-  //     const callEndedUpdateData = {
-  //       callId: call_id,
-  //       agentId: agent_id,
-  //       recordingUrl: recording_url,
-  //       callDuration: newDuration,
-  //       disconnectionReason: disconnection_reason,
-  //       callBackDate: callbackDate,
-  //       retellCallStatus: call_status,
-  //       agentName: agentNameEnum,
-  //       duration: convertMsToHourMinSec(end_timestamp - start_timestamp) || 0,
-  //       timestamp: end_timestamp,
-  //       ...(transcript && { transcript }),
-  //     };
-  
-  //     const results = await EventModel.findOneAndUpdate(
-  //       { callId: call_id, agentId: agent_id },
-  //       { $set: callEndedUpdateData },
-  //       { upsert: true, returnOriginal: false },
-  //     );
-  
-  //     // Call History Update
-  //     const callData = {
-  //       callId: call_id,
-  //       agentId: agent_id,
-  //       recordingUrl: recording_url || null,
-  //       disconnectionReason: disconnection_reason || null,
-  //       callStatus,
-  //       startTimestamp: start_timestamp || null,
-  //       endTimestamp: end_timestamp || null,
-  //       durationMs: newDuration,
-  //       transcript: transcript || null,
-  //       publicLogUrl: public_log_url || null,
-  //       agentName: agentNameEnum,
-  //       date: todayString,
-  //     };
-  
-  //     await callHistoryModel.findOneAndUpdate(
-  //       { callId: call_id, agentId: agent_id },
-  //       { $set: callData },
-  //       { upsert: true, returnOriginal: false },
-  //     );
-  
-  //     // Daily Stats Update
-  //     const resultForCheck = await contactModel.findOne({
-  //       callId: call_id,
-  //       agentId: agent_id,
-  //     });
-  
-  //     let statsResults;
-  //     if (resultForCheck?.calledTimes < 0) {
-  //       statsResults = await DailyStatsModel.findOneAndUpdate(
-  //         { day: todayString, agentId: agent_id, jobProcessedBy: retell_llm_dynamic_variables.job_id || null },
-  //         statsUpdate,
-  //         { upsert: true, returnOriginal: false },
-  //       );
-  
-  //       await updateStatsByHour(agent_id, todayString, new Date());
-  //     }
-  
-  //     // Contact Model Update
-  //     const updateData: any = {
-  //       dial_status: callStatus,
-  //       $push: { datesCalled: todaysDateForDatesCalled },
-  //       referenceToCallId: results._id,
-  //       timesCalled: time,
-  //       $inc: { calledTimes: 1 },
-  //     };
-  
-  //     if (statsResults) {
-  //       updateData.linktocallLogModel = statsResults._id;
-  //     }
-  
-  //     await contactModel.findOneAndUpdate(
-  //       { callId: call_id, agentId: agent_id },
-  //       updateData,
-  //     );
-  //   } catch (error) {
-  //     console.error("Error in handleCallEnded:", error.message, error.stack);
-  //   }
-  // }
-  
   async handleCallAnalyzed(payload: any) {
     try {
       const url = process.env.CAN_URL;
@@ -1218,7 +1049,10 @@ export class Server {
       );
 
       try {
-        const result = await contactModel.findOne({callId: payload.call.call_id, agentId: payload.call.agent_id})
+        const result = await contactModel.findOne({
+          callId: payload.call.call_id,
+          agentId: payload.call.agent_id,
+        });
         if (
           payload.data.call_analysis.call_successful === false &&
           analyzedTranscriptForSentiment.message.content === "interested"
@@ -1253,18 +1087,15 @@ export class Server {
 
           // })
 
-          const result = await axios.post(
-            process.env.MAKE_URL,
-            {
-              firstname:payload.data.retell_llm_dynamic_variables.user_firstname ,
-              lastname:payload.data.retell_llm_dynamic_variables.user_lastname ,
-              email: payload.data.retell_llm_dynamic_variables.user_email,
-              phone: payload.call.to_number,
-              summary: payload.data.call_analysis.call_summary,
-              url: payload.data?.recording_url || null,
-              transcript: payload.data.transcript
-            },
-          );
+          const result = await axios.post(process.env.MAKE_URL, {
+            firstname: payload.data.retell_llm_dynamic_variables.user_firstname,
+            lastname: payload.data.retell_llm_dynamic_variables.user_lastname,
+            email: payload.data.retell_llm_dynamic_variables.user_email,
+            phone: payload.call.to_number,
+            summary: payload.data.call_analysis.call_summary,
+            url: payload.data?.recording_url || null,
+            transcript: payload.data.transcript,
+          });
         }
       } catch (error) {
         console.log("errror recalling", error);
@@ -1581,6 +1412,7 @@ export class Server {
         sentimentOption,
         agentIds,
         tag,
+        dateOption,
         page = 1,
         limit = 100,
       } = req.body;
@@ -1633,16 +1465,6 @@ export class Server {
           ]);
         }
 
-        if (startDate || endDate) {
-          query["datesCalled"] = {};
-          if (startDate && !endDate) {
-            query["datesCalled"]["$eq"] = formatDateToDB(startDate);
-          } else if (startDate && endDate) {
-            query["datesCalled"]["$gte"] = formatDateToDB(startDate);
-            query["datesCalled"]["$lte"] = formatDateToDB(endDate);
-          }
-        }
-
         let statusOptions;
         if (statusOption === "called") {
           statusOptions = callstatusenum.CALLED;
@@ -1687,6 +1509,69 @@ export class Server {
         let totalRecords = 0;
         let totalPages = 0;
 
+        const timeZone = "America/Los_Angeles"; // PST time zone
+        const now = new Date();
+        const zonedNow = toZonedTime(now, timeZone);
+        const today = format(zonedNow, "yyyy-MM-dd", { timeZone });
+        let dateFilter = {};
+        let dateFilter1 = {};
+        console.log(dateOption);
+        if (dateOption) {
+          switch (dateOption) {
+            case DateOption.Today:
+              query["datesCalled"] = today;
+              break;
+            case DateOption.Yesterday:
+              const zonedYesterday = toZonedTime(subDays(now, 1), timeZone);
+              const yesterday = format(zonedYesterday, "yyyy-MM-dd", {
+                timeZone,
+              });
+              query["datesCalled"] = yesterday;
+              break;
+            case DateOption.ThisWeek:
+              const weekdays: string[] = [];
+              for (let i = 0; i < 7; i++) {
+                const day = subDays(zonedNow, i);
+                const dayOfWeek = day.getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                  weekdays.push(format(day, "yyyy-MM-dd", { timeZone }));
+                }
+              }
+              query["datesCalled"] = { $in: weekdays };
+              break;
+            case DateOption.ThisMonth:
+              const monthDates: string[] = [];
+              for (let i = 0; i < now.getDate(); i++) {
+                const day = subDays(now, i);
+                monthDates.unshift(format(day, "yyyy-MM-dd", { timeZone }));
+              }
+              query["datesCalled"] = { $in: monthDates };
+              break;
+            case DateOption.Total:
+              // Don't filter by dates for "Total"
+              break;
+          }
+        } else if (startDate || endDate) {
+          query["datesCalled"] = {};
+          if (startDate && !endDate) {
+            query["datesCalled"]["$eq"] = formatDateToDB(startDate);
+          } else if (startDate && endDate) {
+            query["datesCalled"]["$gte"] = formatDateToDB(startDate);
+            query["datesCalled"]["$lte"] = formatDateToDB(endDate);
+          }
+        }
+
+        //   if(dateOption){
+        //     query["datesCalled"] = dateFilter
+        // } else if (startDate || endDate) {
+        //   query["datesCalled"] = {};
+        //   if (startDate && !endDate) {
+        //     query["datesCalled"]["$eq"] = formatDateToDB(startDate);
+        //   } else if (startDate && endDate) {
+        //     query["datesCalled"]["$gte"] = formatDateToDB(startDate);
+        //     query["datesCalled"]["$lte"] = formatDateToDB(endDate);
+        //   }
+        // }
         if (sentimentOption) {
           results = await contactModel
             .find(query)
@@ -1709,7 +1594,7 @@ export class Server {
           totalRecords = await contactModel.countDocuments(query);
           totalPages = Math.ceil(totalRecords / limit);
 
-          console.log(query)
+          console.log(query);
           results = await contactModel
             .find(query)
             .populate("referenceToCallId")
@@ -1732,7 +1617,7 @@ export class Server {
           status: history.referenceToCallId?.retellCallStatus || "",
           recordingUrl: history.referenceToCallId?.recordingUrl || "",
           address: history.address || "",
-          callId: history.callId || ""
+          callId: history.callId || "",
         }));
         res.json({
           page,
@@ -1893,7 +1778,7 @@ export class Server {
           totalRecords = await contactModel.countDocuments(query);
           totalPages = Math.ceil(totalRecords / limit);
 
-          console.log(query)
+          console.log(query);
           results = await contactModel
             .find(query)
             .populate("referenceToCallId")
@@ -1902,7 +1787,6 @@ export class Server {
             .sort();
         }
 
- 
         res.json({
           page,
           limit,
@@ -2230,19 +2114,15 @@ export class Server {
   }
   testingMake() {
     this.app.post("/make", async (req: Request, res: Response) => {
-      const result = await axios.post(
-        process.env.MAKE_URL_FOR_GHL,
-        {
-          firstname: "Nick",
-          lastname:"Bernadini",
-          email: "nick@email.com",
-          phone: +12343343232,
-          summary: "a call was made",
-          url: "http:url.com",
-          transcript:"Testing",
-
-        },
-      );
+      const result = await axios.post(process.env.MAKE_URL_FOR_GHL, {
+        firstname: "Nick",
+        lastname: "Bernadini",
+        email: "nick@email.com",
+        phone: +12343343232,
+        summary: "a call was made",
+        url: "http:url.com",
+        transcript: "Testing",
+      });
       console.log(result);
       res.send("done");
     });
@@ -3108,7 +2988,6 @@ export class Server {
             .sort({ startTimestamp: -1 })
             .skip(skip)
             .limit(pageSize);
-          
 
           const callHistories = callHistory.map((history) => ({
             firstname: history.userFirstname || "",
@@ -3125,8 +3004,7 @@ export class Server {
             recordingUrl: history.recordingUrl || "",
             address: history.address || "",
             callId: history.callId || "",
-            dial_status: history.dial_status || ""
-            
+            dial_status: history.dial_status || "",
           }));
 
           const totalCount = await callHistoryModel.countDocuments({
@@ -3148,7 +3026,6 @@ export class Server {
             .status(500)
             .json({ success: false, message: "Internal Server Error" });
         }
-      
       },
     );
   }

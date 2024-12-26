@@ -1,12 +1,12 @@
 import { DateOption, IContact, Ijob, callstatusenum } from "../utils/types";
-import { contactModel, EventModel, jobModel } from "./contact_model";
+import { contactModel, EventModel, jobModel } from "../models/contact_model";
 import mongoose, { Document } from "mongoose";
 import axios from "axios";
 import Retell from "retell-sdk";
 import { subDays, startOfMonth, startOfWeek } from "date-fns";
 import { format, toZonedTime } from "date-fns-tz";
-import { DailyStatsModel } from "./call_log";
-import callHistoryModel from "./history_model";
+import { DailyStatsModel } from "../models/logModel";
+import callHistoryModel from "../models/historyModel";
 
 const retell = new Retell({
   apiKey: process.env.RETELL_API_KEY,
@@ -298,20 +298,21 @@ export const updateContactAndTranscript = async (
   }
 };
 
-
 export const updateContactAndTranscriptForClient = async (
   update: any,
 ): Promise<any> => {
-  console.log(update,"hr")
+  console.log(update, "hr");
   try {
     if (!update.callId) {
       throw new Error("callId is required for updating records");
     }
 
-    console.log(update)
+    console.log(update);
     // Helper function to filter out undefined values
     const filterFields = (fields: any) =>
-      Object.fromEntries(Object.entries(fields).filter(([_, value]) => value !== undefined));
+      Object.fromEntries(
+        Object.entries(fields).filter(([_, value]) => value !== undefined),
+      );
 
     // Data for each model
     const dataForContactModel = filterFields({
@@ -333,7 +334,6 @@ export const updateContactAndTranscriptForClient = async (
       address: update.address,
     });
 
-
     const dataForTranscriptModel = filterFields({
       transcript: update.transcript,
       retellCallSummary: update.summary,
@@ -342,53 +342,51 @@ export const updateContactAndTranscriptForClient = async (
       retellCallStatus: update.status,
       recordingUrl: update.recordingUrl,
       address: update.address,
-      analyzedTranscript:update.sentiment
+      analyzedTranscript: update.sentiment,
     });
-
-    
 
     const updatedData: any = {};
 
     // Update contactModel and merge updated fields
     if (Object.keys(dataForContactModel).length > 0) {
-      console.log(dataForContactModel)
+      console.log(dataForContactModel);
       await contactModel.findOneAndUpdate(
         { callId: update.callId },
         { $set: dataForContactModel },
-        { new: true }
+        { new: true },
       );
-      Object.assign(updatedData, dataForContactModel); 
+      Object.assign(updatedData, dataForContactModel);
     }
 
     // Update callHistoryModel and merge updated fields
     if (Object.keys(dataForHistoryModel).length > 0) {
-      console.log(dataForHistoryModel)
+      console.log(dataForHistoryModel);
       await callHistoryModel.findOneAndUpdate(
         { callId: update.callId },
         { $set: dataForHistoryModel },
-        { new: true }
+        { new: true },
       );
       Object.assign(updatedData, dataForHistoryModel);
     }
 
     // Update callHistoryModel and merge updated fields
     if (Object.keys(dataForTranscriptModel).length > 0) {
-      console.log(dataForTranscriptModel)
+      console.log(dataForTranscriptModel);
       await EventModel.findOneAndUpdate(
         { callId: update.callId },
         { $set: dataForTranscriptModel },
-        { new: true }
+        { new: true },
       );
       Object.assign(updatedData, dataForTranscriptModel);
     }
-
 
     return {
       message: "Update successful",
       updatedData,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     console.error("Error updating contact and transcript:", {
       error: errorMessage,
       callId: update.callId,

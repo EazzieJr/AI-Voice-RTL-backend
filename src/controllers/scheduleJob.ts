@@ -1,12 +1,11 @@
-
-import { contactModel, jobModel } from "../contacts/contact_model";
+import { contactModel, jobModel } from "../models/contact_model";
 import { v4 as uuidv4 } from "uuid";
 import { callstatusenum, jobstatus } from "../utils/types";
 import schedule from "node-schedule";
 import Retell from "retell-sdk";
 import moment from "moment-timezone";
-import { DailyStatsModel } from "../contacts/call_log";
-import { formatPhoneNumber } from "../helper-fuction/formatter";
+import { DailyStatsModel } from "../models/logModel";
+import { formatPhoneNumber } from "../utils/formatter";
 
 const retellClient = new Retell({
   apiKey: process.env.RETELL_API_KEY,
@@ -19,7 +18,7 @@ export const scheduleCronJob = async (
   fromNumber: string,
   formattedDate: string,
   lowerCaseTag: string,
-  address:string
+  address: string,
 ) => {
   const jobId = uuidv4();
   const todayString = new Date().toISOString().split("T")[0];
@@ -57,7 +56,6 @@ export const scheduleCronJob = async (
       tagProcessedFor: lowerCaseTag,
     });
 
-    
     const contactLimit = limit ? parseInt(limit) : null;
     const contacts = await contactModel
       .find({
@@ -104,24 +102,23 @@ export const scheduleCronJob = async (
         );
 
         for (const contact of contacts) {
-          
           currentJob = await jobModel.findOne({ jobId });
           const now = moment().tz("America/Los_Angeles");
 
           // Time cutoff check
-          // if (
-          //   now.hour() > CUTOFF_HOUR ||
-          //   (now.hour() === CUTOFF_HOUR && now.minute() >= CUTOFF_MINUTE)
-          // ) {
-          //   console.log(
-          //     "Job processing stopped due to time cutoff (9:45 PST).",
-          //   );
-          //   await jobModel.updateOne(
-          //     { jobId },
-          //     { callstatus: "cancelled", shouldContinueProcessing: false },
-          //   );
-          //   break;
-          // }
+          if (
+            now.hour() > CUTOFF_HOUR ||
+            (now.hour() === CUTOFF_HOUR && now.minute() >= CUTOFF_MINUTE)
+          ) {
+            console.log(
+              "Job processing stopped due to time cutoff (9:45 PST).",
+            );
+            await jobModel.updateOne(
+              { jobId },
+              { callstatus: "cancelled", shouldContinueProcessing: false },
+            );
+            break;
+          }
 
           if (!currentJob || currentJob.shouldContinueProcessing === false) {
             console.log("Job processing stopped by user flag.");
@@ -140,7 +137,7 @@ export const scheduleCronJob = async (
               agentId,
             };
 
-             await retellClient.call.registerPhoneCall({
+            await retellClient.call.registerPhoneCall({
               agent_id: agentId,
               from_number: fromNumber,
               to_number: formatPhoneNumber(postdata.toNumber),
@@ -149,22 +146,23 @@ export const scheduleCronJob = async (
                 user_email: contact.email,
                 user_lastname: contact.lastname,
                 job_id: jobId,
-                user_address:contact.address
+                user_address: contact.address,
               },
             });
 
-            const registerCallResponse = await retellClient.call.createPhoneCall({
-              from_number: fromNumber,
-              to_number: formatPhoneNumber(postdata.toNumber),
-              override_agent_id: agentId,
-              retell_llm_dynamic_variables: {
-                user_firstname: contact.firstname,
-                user_email: contact.email,
-                user_lastname: contact.lastname,
-                job_id: jobId,
-                user_address:contact.address
-              },
-            });
+            const registerCallResponse =
+              await retellClient.call.createPhoneCall({
+                from_number: fromNumber,
+                to_number: formatPhoneNumber(postdata.toNumber),
+                override_agent_id: agentId,
+                retell_llm_dynamic_variables: {
+                  user_firstname: contact.firstname,
+                  user_email: contact.email,
+                  user_lastname: contact.lastname,
+                  job_id: jobId,
+                  user_address: contact.address,
+                },
+              });
 
             await contactModel.findByIdAndUpdate(contact._id, {
               callId: registerCallResponse.call_id,

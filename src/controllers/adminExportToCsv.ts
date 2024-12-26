@@ -1,5 +1,5 @@
 import { createObjectCsvWriter } from "csv-writer";
-import { contactModel, jobModel } from "../contacts/contact_model";
+import { contactModel, jobModel } from "../models/contact_model";
 import path from "path";
 import { callSentimentenum, callstatusenum, DateOption } from "../utils/types";
 import { differenceInDays, addDays } from "date-fns";
@@ -187,7 +187,7 @@ export const logsToCsv = async (
 
     const foundContacts = await contactQuery.exec();
 
-    console.log(foundContacts.length)
+    console.log(foundContacts.length);
     const filePath = path.join(__dirname, "..", "..", "public", "logs.csv");
 
     const csvWriter = createObjectCsvWriter({
@@ -220,9 +220,9 @@ export const logsToCsv = async (
     } else if (sentimentOption === "negative") {
       callSentimentStatus = callSentimentenum.NEGATIVE;
     } else if (sentimentOption === "all") {
-      callSentimentStatus ="";
+      callSentimentStatus = "";
     }
-    console.log(callSentimentStatus)
+    console.log(callSentimentStatus);
     const contactsData = foundContacts
       .map((contact) => ({
         firstname: contact.firstname,

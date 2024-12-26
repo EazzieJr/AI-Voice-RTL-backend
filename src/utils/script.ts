@@ -1,7 +1,7 @@
 import OpenAI from "openai";
-import callHistoryModel from "./contacts/history_model";
-import { reviewTranscript } from "./helper-fuction/transcript-review";
-import { callstatusenum } from "./utils/types";
+import callHistoryModel from "../models/historyModel";
+import { reviewTranscript } from "./transcript-review";
+import { callstatusenum } from "./types";
 import Retell from "retell-sdk";
 
 // Helper function to split an array into chunks
@@ -19,16 +19,21 @@ async function processBatch(batch: any[], retellClient: Retell) {
       try {
         const result = await retellClient.call.retrieve(contact.callId);
         const isCallFailed = result.disconnection_reason === "dial_failed";
-        const isCallTransferred = result.disconnection_reason === "call_transfer";
+        const isCallTransferred =
+          result.disconnection_reason === "call_transfer";
         const isDialNoAnswer = result.disconnection_reason === "dial_no_answer";
         const isCallInactivity = result.disconnection_reason === "inactivity";
         const isCallAnswered =
           result.disconnection_reason === "user_hangup" ||
           result.disconnection_reason === "agent_hangup";
 
-        const analyzedTranscriptForStatus = await reviewTranscript(result.transcript);
-        const isCallScheduled = analyzedTranscriptForStatus.message.content === "scheduled";
-        const isMachine = analyzedTranscriptForStatus.message.content === "voicemail";
+        const analyzedTranscriptForStatus = await reviewTranscript(
+          result.transcript,
+        );
+        const isCallScheduled =
+          analyzedTranscriptForStatus.message.content === "scheduled";
+        const isMachine =
+          analyzedTranscriptForStatus.message.content === "voicemail";
         const isIVR = analyzedTranscriptForStatus.message.content === "ivr";
 
         let callStatus;
@@ -52,7 +57,7 @@ async function processBatch(batch: any[], retellClient: Retell) {
 
         await callHistoryModel.findOneAndUpdate(
           { callId: result.call_id, agentId: result.agent_id },
-          { dial_status: callStatus }
+          { dial_status: callStatus },
         );
 
         return { success: true, contactId: contact.callId };
@@ -60,7 +65,7 @@ async function processBatch(batch: any[], retellClient: Retell) {
         console.error(`Error processing contact ${contact.callId}:`, error);
         return { success: false, contactId: contact.callId, error };
       }
-    })
+    }),
   );
 
   return results;
@@ -72,7 +77,10 @@ export async function script() {
       apiKey: process.env.RETELL_API_KEY,
     });
 
-    const contacts = await callHistoryModel.find(); // Fetch all contacts
+    const contacts = await callHistoryModel
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(6000); // Fetch all contacts
     const batches = chunkArray(contacts, 1000); // Split into batches of 1000
 
     for (const [index, batch] of batches.entries()) {
@@ -84,7 +92,9 @@ export async function script() {
       const errorCount = results.filter((r) => !r.success).length;
 
       console.log(
-        `Batch ${index + 1} completed: ${successCount} successful, ${errorCount} failed.`
+        `Batch ${
+          index + 1
+        } completed: ${successCount} successful, ${errorCount} failed.`,
       );
     }
 
@@ -94,3 +104,14 @@ export async function script() {
   }
 }
 
+export function convertMsToHourMinSec(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0",
+  )}:${String(seconds).padStart(2, "0")}`;
+}
