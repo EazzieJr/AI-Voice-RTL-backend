@@ -559,7 +559,6 @@ export class Server {
         const result = await contactModel.updateMany(query, {
           dial_status: callstatusenum.NOT_CALLED,
           answeredByVM: false,
-          datesCalled: [],
           isusercalled: false,
           timesCalled: "",
         });
@@ -772,6 +771,7 @@ export class Server {
       let sentimentStatus;
       let statsUpdate: any = { $inc: {} };
 
+      console.log("here")
       function convertMsToHourMinSec(ms: number): string {
         const totalSeconds = Math.floor(ms / 1000);
         const hours = Math.floor(totalSeconds / 3600);
