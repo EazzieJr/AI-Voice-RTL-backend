@@ -38,6 +38,7 @@ export interface IContact {
   timesCalled: string
   address:string
   calledTimes: number
+  isTaken: boolean
 }
 
 export enum DaysToBeProcessedEnum{

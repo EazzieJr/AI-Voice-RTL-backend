@@ -84,6 +84,7 @@ const ContactSchema = new Schema<IContact>(
       type:Number
     },
     address: { type: String },
+    isTaken:{type:Boolean, default: false}
   },
   { timestamps: true },
 );

@@ -32,7 +32,7 @@ export const scheduleCronJob = async (
 
     const existingJob = await jobModel.findOne({
       agentId,
-      tagProcessedFor: lowerCaseTag,
+      scheduledTime: formattedDate,
       callstatus: { $in: [jobstatus.ON_CALL, jobstatus.QUEUED] },
       shouldContinueProcessing: true,
     });
@@ -64,9 +64,17 @@ export const scheduleCronJob = async (
         isDeleted: false,
         ...(lowerCaseTag ? { tag: lowerCaseTag } : {}),
         isOnDNCList: false,
+        isTaken:false
       })
       .limit(contactLimit)
       .sort({ createdAt: "desc" });
+      if (contacts.length > 0) {
+        const contactIds = contacts.map(contact => contact._id);
+        await contactModel.updateMany(
+          { _id: { $in: contactIds } },
+          { $set: { isTaken: true } }
+        );
+      }
 
     const job = schedule.scheduleJob(jobId, scheduledTimePST, async () => {
       try {

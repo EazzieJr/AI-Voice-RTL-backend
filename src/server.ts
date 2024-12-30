@@ -1401,7 +1401,6 @@ export class Server {
       }
     });
   }
-
   searchForClient() {
     this.app.post("/search-client", async (req: Request, res: Response) => {
       const {
@@ -1632,7 +1631,6 @@ export class Server {
       }
     });
   }
-
   searchForAdmin() {
     this.app.post("/search", async (req: Request, res: Response) => {
       const {
