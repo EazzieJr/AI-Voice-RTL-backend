@@ -561,6 +561,7 @@ export class Server {
           answeredByVM: false,
           isusercalled: false,
           timesCalled: "",
+          isTaken:false
         });
         res.json({ result });
       },
