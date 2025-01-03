@@ -24,8 +24,7 @@ const userSchema = new Schema(
   {
     email: {
       type: String,
-      unique: true,
-      required: [true, "provide an email"],
+      unique: true
     },
     password: {
       type: String,
@@ -33,7 +32,7 @@ const userSchema = new Schema(
     },
     username: {
       type: String,
-      required: true,
+      required: [true, "provide a username"],
     },
     group: {
       type: String,

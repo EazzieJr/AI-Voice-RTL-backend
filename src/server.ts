@@ -80,6 +80,7 @@ import { DateTime } from "luxon";
 import { reviewCallback, reviewTranscript } from "./utils/transcript-review";
 import { stat } from "fs/promises";
 import { script } from "./utils/script";
+import HTTP from "./middleware/handler";
 
 connectDb();
 // const smee = new SmeeClient({
@@ -124,6 +125,15 @@ export class Server {
     this.client = new OpenAI({
       apiKey: process.env.OPENAI_APIKEY,
     });
+
+    this.app.get("/", (req, res) => {
+      res.send("Hello World")
+    })
+
+    this.app.use(HTTP.setupRequest);
+    this.app.use(HTTP.processResponse);
+    this.app.use(HTTP.handle404);
+    this.app.use(HTTP.handleError);
 
     this.updateAgent();
     this.getFullStat();
@@ -1882,19 +1892,7 @@ export class Server {
         );
 
         if (!userInDb) {
-          // Log unsuccessful login attempt
-          await userModel.updateOne(
-            { username },
-            {
-              $push: {
-                loginDetails: {
-                  ipAddress: req.ip,
-                  successful: false,
-                },
-              },
-            },
-          );
-          return res.status(400).json({ message: "Invalid login credentials" });
+          return res.status(400).json({ message: "User not found" });
         }
 
         const verifyPassword = await argon2.verify(
