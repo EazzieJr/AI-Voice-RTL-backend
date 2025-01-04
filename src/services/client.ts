@@ -5,10 +5,10 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema } from "../validations/client";
-import Joi from "joi";
+import { DashboardSchema, CallHistorySchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
+import callHistoryModel from "../models/historyModel";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -25,7 +25,7 @@ class ClientService extends RootService {
             const { agentIds } = body;
 
             const check_user = await userModel.findById(clientId);
-            if (!check_user) return res.status(400).json({ message: "User not found"});
+            if (!check_user) return res.status(400).json({ error: "User not found"});
 
             if (!Object.values(DateOption).includes(dateOption)) {
                 return res.status(400).json({ error: "Invalid date option" })
@@ -200,6 +200,91 @@ class ClientService extends RootService {
 
         } catch (error) {
             console.error("Error fetching dashboard stats: ", error);
+            next(error);
+        };
+    };
+
+    async call_history(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = CallHistorySchema.validate(body, { abortEarly: false } );
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { agentIds, startDate, endDate } = body;
+            const page = parseInt(body.page) || 1;
+
+            const pageSize = 100;
+            const skip = (page - 1) * pageSize;
+
+            let query: { [key: string]: any } = {
+                agentId: { $in: agentIds }
+            };
+
+            if ((startDate && !endDate) || (!startDate && endDate)) {
+                return res.status(400).json({ error: "Both start and end dates must be provided"});
+            };
+
+            if (startDate && endDate) {
+                query.startTimestamp = {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate)
+                }
+            };
+
+            const callHistory = await callHistoryModel
+                .find(query)
+                .sort({ startTimestamp: -1 })
+                .skip(skip)
+                .limit(pageSize)
+                .lean();
+
+            if (!callHistory || callHistory.length === 0) {
+                return res.status(200).json({
+                    message: "No Call history found"
+                });
+            };
+
+            const callHistories = callHistory.map((history) => ({
+                callId: history.callId || "",
+                firstName: history.userFirstname || "",
+                lastName: history.userLastname || "",
+                email: history.userEmail || "",
+                phone: history.toNumber || "",
+                agentId: history.agentId || "",
+                duration: history.durationMs || "",
+                status: history.callStatus || "",
+                dial_status: history.dial_status || "",
+                transcript: history.transcript || "",
+                sentiment: history.userSentiment || "",
+                timestamp: history.endTimestamp || "",
+                summary: history.callSummary || "",
+                recording: history.recordingUrl || "",
+                address: history.address || ""
+            }));
+
+            const totalRecords = await callHistoryModel.countDocuments(query);
+            const totalPages = Math.ceil(totalRecords / pageSize);
+
+            if (page > totalPages) {
+                return res.status(400).json({
+                    error: "Page exceeds available data"
+                });
+            };
+
+            return res.status(200).json({
+                callHistories,
+                totalRecords,
+                totalPages,
+                page
+            });
+
+        } catch (error) {
+            console.error("Error fetching call history: ", error);
             next(error);
         };
     };
