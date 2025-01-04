@@ -81,6 +81,7 @@ import { reviewCallback, reviewTranscript } from "./utils/transcript-review";
 import { stat } from "fs/promises";
 import { script } from "./utils/script";
 import HTTP from "./middleware/handler";
+import routeHandlers from "./routes";
 
 connectDb();
 // const smee = new SmeeClient({
@@ -131,6 +132,7 @@ export class Server {
     })
 
     this.app.use(HTTP.setupRequest);
+    this.app.use(routeHandlers);
     this.app.use(HTTP.processResponse);
     this.app.use(HTTP.handle404);
     this.app.use(HTTP.handleError);

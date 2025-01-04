@@ -43,6 +43,7 @@
     "helmet-csp": "^4.0.0",
     "hpp": "^0.2.3",
     "ioredis": "^5.4.1",
+    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.5.0",
     "moment-timezone": "^0.5.45",
