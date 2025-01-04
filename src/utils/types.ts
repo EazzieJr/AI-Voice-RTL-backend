@@ -229,6 +229,7 @@ export enum DateOption {
   Yesterday = 'yesterday',
   ThisWeek = 'week',
   ThisMonth = 'month',
+  PastMonth = 'past-month',
   Total = 'total',
   LAST_SCHEDULE = "last-schedule"
 }

@@ -1,13 +1,14 @@
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { userModel } from '../models/userModel';
-import { Request, Response, NextFunction } from "express";
-import { Document, Model } from 'mongoose';
+import { NextFunction } from "express";
+import { AuthRequest } from './authRequest';
+// import { Document, Model } from 'mongoose';
 
-type UserDocument = Document<unknown, {}, typeof userModel.schema.obj>;
+// type UserDocument = Document<unknown, {}, typeof userModel.schema.obj>;
 
-interface AuthRequest extends Request {
-    user?: UserDocument
-};
+// interface AuthRequest extends Request {
+//     user?: UserDocument
+// };
 
 class AuthMiddleware {
     constructor () {};
@@ -54,3 +55,5 @@ class AuthMiddleware {
         };
     };
 };
+
+export default new AuthMiddleware();
