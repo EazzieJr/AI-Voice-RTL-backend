@@ -1,5 +1,7 @@
+import { contactModel } from "../models/contact_model";
 import RootService from "./_root";
 import { Request, Response, NextFunction } from "express";
+import { callstatusenum } from "../utils/types";
 
 class CallService extends RootService {
     async retell_webhook(req: Request, res: Response, next: NextFunction): Promise<Response>{
@@ -41,9 +43,24 @@ class CallService extends RootService {
 
             console.log("pay: ", payload);
             return res.status(204).send();
-            
+
         } catch (e) {
             console.error("Error while accessing webhook from retell: " + e);
+            next(e);
+        };
+    };
+
+    async call_started(data: any, next: NextFunction) {
+        try {
+            const { call_id, agent_id } = data;
+
+            await contactModel.findOneAndUpdate(
+                { callId: call_id, agentId: agent_id },
+                { dial_status: callstatusenum.IN_PROGRESS }
+            );
+            
+        } catch (e) {
+            console.error("Unable to get data from started call: ", e);
             next(e);
         };
     };
