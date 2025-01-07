@@ -33,10 +33,13 @@ class CallService extends RootService {
             try {
                 if (event === "call_started") {
                     console.log(`call started for: ${data.call_id}`);
+                    await this.call_started(payload, next);
                 } else if (event === "call_ended") {
                     console.log(`call ended: ${data.call_id}`);
+                    await this.call_ended(payload, todayString, todayStringWithTime, time, next);
                 } else if (event === "call_analyzed") {
                     console.log(`call analyzed for: ${data.call_id}`);
+                    await this.call_analyzed(payload, next);
                 } else {
                     return res.status(500).json({ 
                         error: "Invalid event detected",
@@ -79,7 +82,7 @@ class CallService extends RootService {
         };
     };
 
-    async call_ended(payload: any, todayString: string, todaysDateForDatesCalled: any, next: NextFunction) {
+    async call_ended(payload: any, todayString: string, todaysDateForDatesCalled: any, time: any, next: NextFunction) {
         try {
             console.log("payload: ", payload);
             const { event, call, data } = payload;
