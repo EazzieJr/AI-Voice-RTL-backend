@@ -24,7 +24,8 @@ export async function updateStatsByHour(
     const updatedStats = await dailyGraphModel.findOneAndUpdate(
       { date, agentId },
       statsUpdate,
-      { upsert: true, new: true },
+      // { upsert: true, new: true },
+      { returnOriginal: false }
     );
 
     return updatedStats;
