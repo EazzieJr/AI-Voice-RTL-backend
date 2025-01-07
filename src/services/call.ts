@@ -1,12 +1,14 @@
 import { contactModel, EventModel } from "../models/contact_model";
 import RootService from "./_root";
 import { Request, Response, NextFunction } from "express";
-import { callstatusenum } from "../utils/types";
+import { callSentimentenum, callstatusenum } from "../utils/types";
 import { reviewCallback, reviewTranscript } from "../utils/transcript-review";
 import callHistoryModel from "../models/historyModel";
 import { DailyStatsModel } from "../models/logModel";
 import { updateStatsByHour } from "../controllers/graphController";
 import { time } from "console";
+import { nextDay } from "date-fns";
+import axios from "axios";
 
 class CallService extends RootService {
     async retell_webhook(req: Request, res: Response, next: NextFunction): Promise<Response>{
@@ -259,6 +261,98 @@ class CallService extends RootService {
 
         } catch (e) {
             console.error("Unable to get data from call ended: " + e);
+            next(e);
+        };
+    };
+
+    async call_analyzed(payload: any, next: NextFunction) {
+        try {
+            const { event, data, call } = payload;
+            const url = process.env.CAN_URL;
+            const apiKey = process.env.CAN_KEY;
+            const eventBody = { payload }
+
+            let analyzedTranscriptForSentiment;
+            let sentimentStatus;
+
+            analyzedTranscriptForSentiment = await reviewTranscript(data.transcript);
+
+            const is_scheduled = analyzedTranscriptForSentiment.message.content === "scheduled";
+            const is_dnc = analyzedTranscriptForSentiment.message.content === "dnc";
+            const is_callback = analyzedTranscriptForSentiment.message.content === "call-back";
+            const is_neutral = data.call_analysis.user_sentiment === "Neutral";
+            const is_unknown = data.call_analysis.user_sentiment === "Unknown";
+            const is_positive = data.call_analysis.user_sentiment === "Positive";
+            const is_negative = data.call_analysis.user_sentiment === "Negative";
+
+            let addressStat;
+            if (call.agent_id === "") {
+                addressStat = data.call_analysis.address;
+            };
+            
+            if (is_scheduled) {
+                sentimentStatus = callSentimentenum.SCHEDULED;
+            } else if (is_callback) {
+                sentimentStatus = callSentimentenum.CALLBACK;
+            } else if (is_dnc) {
+                sentimentStatus = callSentimentenum.DNC;
+            } else if (is_neutral) {
+                sentimentStatus = callSentimentenum.NEUTRAL;
+            } else if (is_positive) {
+                sentimentStatus = callSentimentenum.POSITIVE;
+            } else if (is_negative) {
+                sentimentStatus = callSentimentenum.NEGATIVE;
+            } else if (is_unknown) {
+                sentimentStatus = callSentimentenum.UNKNOWN;
+            };
+
+            const event_data_to_update = {
+                retellCallSummary: data.call_analysis.call_summary,
+                analyzedTranscript: sentimentStatus,
+                userSentiment: sentimentStatus
+            };
+
+            const results = await EventModel.findOneAndUpdate(
+                { callId: call.call_id, agentId: call.agent_id },
+                { $set: data },
+                { returnOriginal: false }
+            );
+
+            const data2 = {
+                callSummary: data.call_analysis.call_summary,
+                userSentiment: sentimentStatus,
+            };
+
+            await callHistoryModel.findOneAndUpdate(
+                { callId: call.call_id, agentId: call.agent_id },
+                { $set: data2 },
+                { returnOriginal: false },
+            );
+
+            try {
+                // const result = await contactModel.findOne({
+                //     callId: call.call_id,
+                //     agent: call.agent_id
+                // });
+
+                if (data.call_analysis.call_successful === false && analyzedTranscriptForSentiment.message.content === "interested") {
+                    const result = await axios.post(process.env.MAKE_URL, {
+                        firstname: data.retell_llm_dynamic_variables.user_firstname,
+                        lastname: data.retell_llm_dynamic_variables.user_lastname,
+                        email: data.retell_llm_dynamic_variables.user_email,
+                        phone: call.to_number,
+                        summary: data.call_analysis.call_summary,
+                        url: data?.recording_url || null,
+                        transcript: data.transcript,
+                      });
+                }
+            } catch (e) {
+                console.error("error with axios result: ", + e);
+                next(e);
+            };
+
+        } catch (e) {
+            console.error("Error fetching data after call analyzed: ", + e);
             next(e);
         };
     };
