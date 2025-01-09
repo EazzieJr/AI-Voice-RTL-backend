@@ -44,8 +44,11 @@ export const scheduleCronJob = async (
       return { message: "Job already running", jobId: existingJob.jobId };
     }
 
-    const CUTOFF_HOUR = 14;
-    const CUTOFF_MINUTE = 10;
+    // const CUTOFF_HOUR = 14;
+    // const CUTOFF_MINUTE = 10;
+
+    const CUTOFF_HOUR = 15;
+    const CUTOFF_MINUTE = 30;
 
     await jobModel.create({
       callstatus: jobstatus.QUEUED,
