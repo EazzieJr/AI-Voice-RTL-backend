@@ -138,8 +138,13 @@ export const scheduleCronJob = async (
               { jobId },
               { callstatus: "cancelled", shouldContinueProcessing: false },
             );
+
+            console.log("contacts: ", contacts);
+
             if (contacts.length > 0) {
               const contactIds = contacts.map(contact => contact._id);
+              console.log("In here")
+              console.log("cont ids: ", contactIds);
               await contactModel.updateMany(
                 { _id: { $in: contactIds } },
                 { $set: { isTaken: false } }

@@ -573,7 +573,15 @@ export class Server {
           answeredByVM: false,
           isusercalled: false,
           timesCalled: "",
-          isTaken:false
+          // callId: "",
+          isTaken:false,
+          referenceToCallId: null,
+          linktocallLogModel: null,
+          datesCalled: [],
+          dayToBeProcessed: "",
+          jobProcessedWithId: [],
+          isOnDNCList: false,
+          calledTimes: 0
         });
         res.json({ result });
       },

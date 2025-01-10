@@ -117,19 +117,6 @@ class CallService extends RootService {
             };
 
             if (event === "call_ended") {
-                // let agentNameEnum;
-
-                // if (agent_id === "agent_1852d8aa89c3999f70ecba92b8") {
-                //     agentNameEnum = "ARS";
-                // } else if (agent_id === "agent_6beffabb9adf0ef5bbab8e0bb2") {
-                //     agentNameEnum = "LQR";
-                // } else if (agent_id === "agent_155d747175559aa33eee83a976") {
-                //     agentNameEnum = "SDR";
-                // } else if (agent_id === "214e92da684138edf44368d371da764c") {
-                //     agentNameEnum = "TVAG";
-                // } else {
-                //     console.error("Unrecognized agent: ", agent_id);
-                // };
 
                 const call_failed = disconnection_reason === "dial_failed";
                 const call_transferred = disconnection_reason === "call_transfer";
@@ -194,6 +181,8 @@ class CallService extends RootService {
                     callStatus = callstatusenum.CALLED;
                 };
 
+                console.log("dial: ", callStatus);
+
                 const callData = {
                     callId: call_id,
                     agentId: agent_id,
@@ -222,11 +211,15 @@ class CallService extends RootService {
                     dial_status: callStatus,
                 };
 
+                console.log("callData: ", callData);
+
                 const history_update = await callHistoryModel.findOneAndUpdate(
                     { callId: call_id, agentId: agent_id },
                     { $set: callData },
                     { returnOriginal: false }
                 );
+
+                console.log("resu: ", history_update);
 
                 const jobId_from_retell = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id : null;
 
