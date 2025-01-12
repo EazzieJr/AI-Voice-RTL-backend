@@ -8,4 +8,8 @@ router
         call_service.retell_webhook(req, res, next);
     })
 
+    .post("/schedule", (req: Request, res: Response, next: NextFunction) => {
+        call_service.schedule_call(req, res, next);
+    })
+
 export default router;

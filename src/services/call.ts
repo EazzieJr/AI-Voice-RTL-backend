@@ -9,8 +9,58 @@ import { updateStatsByHour } from "../controllers/graphController";
 import { time } from "console";
 import { nextDay } from "date-fns";
 import axios from "axios";
+import { AuthRequest } from "../middleware/authRequest";
+import { ScheduleCallSchema } from "../validations/call";
+import moment from "moment-timezone";
+import { scheduleCronJob } from "../utils/scheduleJob";
 
 class CallService extends RootService {
+
+    async schedule_call(req: Request, res: Response, next: NextFunction): Promise<Response>{
+        try {
+            const body = req.body;
+
+            const { error } = ScheduleCallSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const { hour, minute, agentId, limit, fromNumber, tag } = req.body
+
+            const scheduledTimePST = moment
+                .tz("America/Los_Angeles")
+                .set({
+                    hour,
+                    minute,
+                    second: 0,
+                    millisecond: 0
+                })
+                .toDate();
+
+            const formattedDate = moment(scheduledTimePST).format("YYYY-MM-DDTHH:mm:ss");
+
+            const lowerCaseTag = tag.toLowerCase();
+
+            const call_schedule = await scheduleCronJob(
+                scheduledTimePST,
+                agentId,
+                limit,
+                fromNumber,
+                formattedDate,
+                lowerCaseTag,
+                res,
+                next
+            );
+
+            console.log("call sched: ", call_schedule);
+
+            return res.status(200).json({
+                call_schedule
+            });
+        } catch (e) {
+            console.error("Error scheduling call: " + e);
+            next(e);
+        };
+    };
+
     async retell_webhook(req: Request, res: Response, next: NextFunction): Promise<Response>{
         try {
             const payload = req.body;

@@ -6,7 +6,7 @@ import { callstatusenum, jobstatus } from "./types";
 import schedule from "node-schedule";
 import moment from "moment-timezone";
 import { formatPhoneNumber } from "./formatter";
-import { NextFunction } from "express";
+import { Response, NextFunction } from "express";
 
 const retell_client = new Retell({
     apiKey: process.env.RETELL_API_KEY
@@ -19,6 +19,7 @@ export const scheduleCronJob = async (
     fromNumber: string,
     formattedDate: string,
     lowerCaseTag: string,
+    res: Response,
     next: NextFunction
 ) => {
 
@@ -39,7 +40,11 @@ export const scheduleCronJob = async (
 
         if (existingJob) {
             console.log(`job running for ${agentId} and tag ${lowerCaseTag}`);
-            return { message: "job already running", jobId: existingJob.jobId };
+            // return { message: "job already running", jobId: existingJob.jobId };
+            return res.status(200).json({
+                message: "Job already running",
+                jobId: existingJob.jobId
+            });
         };
 
         const newJob = await jobModel.create({
@@ -52,7 +57,8 @@ export const scheduleCronJob = async (
         });
 
         if (!newJob._id) {
-            return next(new Error("Unable to create new Job model"));
+            // return next(new Error("Unable to create new Job model"));
+            return res.status(500).json({ message: "Unable to create new Job model" });
         };
         await DailyStatsModel.create({
             day: todayString,
@@ -64,6 +70,7 @@ export const scheduleCronJob = async (
             .find({
                 agentId,
                 dial_status: callstatusenum.NOT_CALLED,
+                isDeleted: false,
                 ...(lowerCaseTag ? { tag: lowerCaseTag } : {}),
                 isOnDNCList: false,
                 isTaken: false
@@ -72,7 +79,7 @@ export const scheduleCronJob = async (
             .sort({ createdAt: "desc" });
         
         console.log("contacts: ", contacts);
-        if (!contacts?.length) return next(new Error("No contacts found"));
+        if (!contacts?.length) return res.status(400).json({ message: "No contacts found" }) /** return next(new Error("No contacts found")); **/
         
         const contactIds = contacts.map(contact => contact._id);
         console.log("contIds: ", contactIds);
@@ -82,7 +89,8 @@ export const scheduleCronJob = async (
             { $set: { isTaken: true } }
         );
 
-        if (!(contact_update.acknowledged && contact_update.modifiedCount > 0) ) return next(new Error("Schedule: No contacts got updated from isTaken(false"));
+        if (!(contact_update.acknowledged && contact_update.modifiedCount > 0)) return res.status(500).json({ message: "Schedule: No contacts got updated from isTaken to false" });
+         /**return next(new Error("Schedule: No contacts got updated from isTaken(false")); **/
 
         const job = schedule.scheduleJob(jobId, scheduledTimePST, async () => {
             try {
@@ -90,17 +98,17 @@ export const scheduleCronJob = async (
                     { jobId },
                     { callstatus: jobstatus.ON_CALL }
                 );
-                if (!(update_job_status.acknowledged && update_job_status.modifiedCount === 1)) return { message: "Error updating job status" };
+                if (!(update_job_status.acknowledged && update_job_status.modifiedCount === 1)) return res.status(400).json({ message: "Error updating job status to on call" }) /**{ message: "Error updating job status" }; **/
 
                 const contacts_count = await contactModel
                     .countDocuments({
                         agentId,
                         dial_status: callstatusenum.NOT_CALLED,
+                        isDeleted: false,
                         ...(lowerCaseTag ? { tag: lowerCaseTag } : {}),
                         isOnDNCList: false,
-                        isTaken: false
-                    })
-                    .limit(limit);
+                        isTaken: true
+                    });
                 console.log("Total contacts found: ", contacts_count);
 
                 const update_contacts_to_process = await jobModel.updateOne(
@@ -108,13 +116,13 @@ export const scheduleCronJob = async (
                     { totalContactToProcess: contacts_count }
                 );
 
-                if (!(update_contacts_to_process.acknowledged && update_contacts_to_process.modifiedCount === 1)) return next(new Error("Error updating contacts to process"));
+                if (!(update_contacts_to_process.acknowledged && update_contacts_to_process.modifiedCount === 1)) return res.status(400).json({ message: "Error updating contacts to process" }); /**next(new Error("Error updating contacts to process")); **/
 
                 for (const contact of contacts) {
                     const currentJob = await jobModel.findOne({ jobId });
                     const now = moment().tz("America/Los_Angeles");
 
-                    if (!currentJob) return next(new Error(`JobId ${jobId} was not found in the database`));
+                    if (!currentJob) return res.status(500).json({ message: "JobId ${jobId} was not found in the database" }); /** next(new Error(`JobId ${jobId} was not found in the database`)); **/
 
                     if (currentJob.shouldContinueProcessing === false) {
 
@@ -125,9 +133,9 @@ export const scheduleCronJob = async (
 
                         console.log("isTaken: ", set_isTaken_toFalse);
 
-                        if (!(set_isTaken_toFalse.acknowledged && set_isTaken_toFalse.modifiedCount > 0) ) return next(new Error("Schedule: No contacts got updated from isTaken back to true"));
+                        if (!(set_isTaken_toFalse.acknowledged && set_isTaken_toFalse.modifiedCount > 0) ) return res.status(400).json({ message: "Schedule: No contacts got updated from isTaken back to true" }); /**next(new Error("Schedule: No contacts got updated from isTaken back to true")); **/
 
-                        return next(new Error(`shouldContinueProcessing for jobId: ${jobId} has been set to false`));
+                        return res.status(500).json({ message: `shouldContinueProcessing for jobId: ${jobId} has been set to false`}); /**next(new Error(`shouldContinueProcessing for jobId: ${jobId} has been set to false`));**/
                     };
 
                     if (
@@ -143,7 +151,16 @@ export const scheduleCronJob = async (
 
                         console.log("status: ", cancel_job_status);
 
-                        if (!(cancel_job_status.acknowledged && cancel_job_status.modifiedCount === 1)) return next(new Error("Error updating job status to cancelled"));
+                        if (!(cancel_job_status.acknowledged && cancel_job_status.modifiedCount === 1)) return res.status(500).json({ message: "Error updating job status to cancelled"}) /**next(new Error("Error updating job status to cancelled")); **/
+
+                        const set_isTaken_toFalse = await contactModel.updateMany(
+                            { _id: { $in: contactIds } },
+                            { $set: { isTaken: false } }
+                        );
+
+                        console.log("isTaken: ", set_isTaken_toFalse);
+
+                        if (!(set_isTaken_toFalse.acknowledged && set_isTaken_toFalse.modifiedCount > 0) ) return res.status(400).json({ message: "Schedule: No contacts got updated from isTaken back to true" });
                     };
 
                     try {
@@ -196,7 +213,7 @@ export const scheduleCronJob = async (
                             }
                         );
 
-                        if (!(update_callId.acknowledged && update_callId.modifiedCount === 1) ) return next(new Error("Unable to update callId in contact model"));
+                        if (!(update_callId.acknowledged && update_callId.modifiedCount === 1) ) return res.status(400).json({ message: "Unable to update callId in contact model" }) /** next(new Error("Unable to update callId in contact model")); **/
 
                         const updated_proc_contacts = currentJob.processedContacts + 1;
                         const currentPercentage = (updated_proc_contacts / contacts_count) * 100;
@@ -212,13 +229,16 @@ export const scheduleCronJob = async (
                             }
                         );
 
-                        if (!(update_job_processed_contacts.acknowledged && update_job_processed_contacts.modifiedCount === 1) ) return next(new Error("Unable to update processed contacts in job model"));
+                        if (!(update_job_processed_contacts.acknowledged && update_job_processed_contacts.modifiedCount === 1) ) return res.status(400).json({ message: "Unable to update processed contacts in job model"}) /** next(new Error("Unable to update processed contacts in job model")); **/
 
                         console.log(`Call successful for ${contact.firstname}`);
 
                     } catch (e) {
                         console.error("Error creating phone call: ", e);
-                        next(e);
+                        // return res.status(500).json({
+                        //     error: e,
+                        //     message: "Error creating phone call"
+                        // });
                     };
 
                     await new Promise((resolve) => setTimeout(resolve, 4000));
@@ -232,20 +252,26 @@ export const scheduleCronJob = async (
                     }
                 );
 
-                if (!(update_status_to_called.acknowledged && update_status_to_called.modifiedCount === 1) ) return next(new Error("Unable to update call status to called"));
+                if (!(update_status_to_called.acknowledged && update_status_to_called.modifiedCount === 1) ) return res.status(400).json({ message: "Unable to update call status to called"}) /** next(new Error("Unable to update call status to called")); **/
 
             } catch (e) {
                 console.error(`Error creating schedule for jobId: ${jobId} `, e);
-                next(e);
+                // return res.status(500).json({
+                //     error: e,
+                //     message: `Error creating schedule for JobId: ${jobId}`
+                // });
             };
         });
 
-        console.log(`Job: ${jobId} successful, Next scheduled run: ${job.nextInvocation()}`);
+        // console.log(`Job: ${jobId} successful, Next scheduled run: ${job.nextInvocation()}`);
 
         return { jobId, scheduleTine: scheduledTimePST, contacts };
 
     } catch (e) {
         console.error("Error scheduling cron job: ", e);
-        next(e);
-    }; 
+        return res.status(500).json({
+            error: e,
+            message: "Error scheduling cron job"
+        });
+    };
 };
