@@ -8,3 +8,7 @@ export const ScheduleCallSchema = Joi.object({
     fromNumber: Joi.string().required(),
     tag: Joi.string().required()
 });
+
+export const CancelScheduleSchema = Joi.object({
+    jobId: Joi.string().required()
+});

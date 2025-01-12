@@ -1,7 +1,7 @@
-import { contactModel, EventModel } from "../models/contact_model";
+import { contactModel, EventModel, jobModel } from "../models/contact_model";
 import RootService from "./_root";
 import { Request, Response, NextFunction } from "express";
-import { callSentimentenum, callstatusenum } from "../utils/types";
+import { callSentimentenum, callstatusenum, jobstatus } from "../utils/types";
 import { reviewCallback, reviewTranscript } from "../utils/transcript-review";
 import callHistoryModel from "../models/historyModel";
 import { DailyStatsModel } from "../models/logModel";
@@ -10,9 +10,10 @@ import { time } from "console";
 import { nextDay } from "date-fns";
 import axios from "axios";
 import { AuthRequest } from "../middleware/authRequest";
-import { ScheduleCallSchema } from "../validations/call";
+import { CancelScheduleSchema, ScheduleCallSchema } from "../validations/call";
 import moment from "moment-timezone";
 import { scheduleCronJob } from "../utils/scheduleJob";
+import schedule from "node-schedule";
 
 class CallService extends RootService {
 
@@ -399,6 +400,73 @@ class CallService extends RootService {
 
         } catch (e) {
             console.error("Error fetching data after call analyzed: ", + e);
+            next(e);
+        };
+    };
+
+    async cancel_schedule(req: AuthRequest, res: Response, next: NextFunction): Promise<Response>{
+        try {
+            const body = req.body;
+
+            const { error } = CancelScheduleSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const { jobId } = body;
+
+            const job = await jobModel.findOne({ jobId });
+            if (!job) return res.status(400).json({ message: `Job with JobId: ${jobId} not found`});
+
+            const { agentId, tagProcessedFor } = job;
+
+            const update_contacts = await contactModel.updateMany(
+                { 
+                    agentId, 
+                    tag: tagProcessedFor, 
+                    isTaken: true,
+                    isDeleted: false
+                },
+                { isTaken: false }
+            );
+
+            console.log("cont_update: ", update_contacts);
+
+            if (!update_contacts.acknowledged) return res.status(400).json({ message: "Failed to update contacts isTaken to false"});
+
+
+            const scheduledJobs = schedule.scheduledJobs;
+
+            console.log("scheudles: ", scheduledJobs);
+            if (!scheduledJobs.hasOwnProperty(jobId)) {
+                return res.status(404).json({ message: `Job with ${jobId} not found or has been executed`});
+            };
+
+            const isCancelled = schedule.cancelJob(jobId);
+            if (isCancelled) {
+                const update_job = await jobModel.findOneAndUpdate(
+                    { 
+                        jobId,
+                        callstatus: {
+                            $ne: "cancelled"
+                        }
+                    },
+                    {
+                        callstatus: jobstatus.CANCELLED,
+                        shouldContinueProcessing: false
+                    },
+                    { new: true }
+                );
+
+                console.log("update: ", update_job);
+                if (!update_job) return res.status(400).json({ message: "Error setting call status to cancelled"});
+
+                res.status(200).json({ schedule_cancelled: update_job });
+
+            } else {
+                res.status(500).json({ message: `Unable to cancel job with JobId: ${jobId}` });
+            };
+
+        } catch(e) {
+            console.error("Error cancelling schedule" + e);
             next(e);
         };
     };
