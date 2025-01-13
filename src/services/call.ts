@@ -313,6 +313,13 @@ class CallService extends RootService {
                 } else {
                     console.log("stat: ", statResults);
                 };
+
+                const update_contact = await contactModel.findOneAndUpdate(
+                    { callId: call_id, agentId: agent_id },
+                    { $set: updateData }
+                );
+
+                console.log("updat: ", update_contact);
                 
             } else {
                 console.error("Event must be call_ended: ", event);
