@@ -134,7 +134,7 @@ class CallService extends RootService {
                 };
 
                 const hist_data = await callHistoryModel.create({
-                    callI: call_id,
+                    callId: call_id,
                     agentId: agent_id
                 });
 
