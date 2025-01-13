@@ -382,6 +382,14 @@ class ClientService extends RootService {
                         );
                     };
 
+                    fs.unlink(csvFile.path, (err) => {
+                        if (err) {
+                            console.error("Unable to delete file: ", err);
+                        } else {
+                            console.log("Deleted file successfully");
+                        };
+                    });
+
                     res.status(200).json({
                         message: `Upload successful, contacts uploaded: ${finalUsersToInsert.length}`,
                         duplicates: dbDuplicates,

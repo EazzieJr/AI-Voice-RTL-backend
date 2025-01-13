@@ -13,7 +13,7 @@ router
     .get("/history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.call_history(req, res, next))
 
     .post("/upload-csv", 
-        authenticate,
+        // authenticate,
         upload.single("csvFile"),
         (req: AuthRequest, res: Response, next: NextFunction) => client_service.upload_csv(req, res, next))
 
