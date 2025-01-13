@@ -133,6 +133,15 @@ class CallService extends RootService {
                     console.log("Error creating new event model");
                 };
 
+                const hist_data = await callHistoryModel.create({
+                    callI: call_id,
+                    agentId: agent_id
+                });
+
+                if (!hist_data._id) {
+                    console.log("Error creating new event model");
+                };
+
             } else {
                 console.error("Event must be call_started: ", event);
             }            
