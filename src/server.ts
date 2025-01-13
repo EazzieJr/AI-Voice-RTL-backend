@@ -37,7 +37,7 @@ import {
   jobstatus,
 } from "./utils/types";
 import * as Papa from "papaparse";
-import { subDays, startOfMonth } from "date-fns";
+import { subDays, startOfMonth, isFirstDayOfMonth } from "date-fns";
 import fs from "fs";
 import multer from "multer";
 import moment from "moment-timezone";
@@ -128,8 +128,8 @@ export class Server {
     });
 
     this.app.get("/", (req, res) => {
-      res.send("Hello World")
-    })
+      res.send("Hello World");
+    });
 
     this.app.use(HTTP.setupRequest);
     this.app.use(routeHandlers);
@@ -792,7 +792,10 @@ export class Server {
       let sentimentStatus;
       let statsUpdate: any = { $inc: {} };
 
-      console.log("here")
+      //console.log("here")
+      console.log({
+        firstname: payload.retell_llm_dynamic_variables.user_firstname,
+      });
       function convertMsToHourMinSec(ms: number): string {
         const totalSeconds = Math.floor(ms / 1000);
         const hours = Math.floor(totalSeconds / 3600);
@@ -2121,19 +2124,49 @@ export class Server {
   }
   testingMake() {
     this.app.post("/make", async (req: Request, res: Response) => {
-      const result = await axios.post(process.env.MAKE_URL_FOR_GHL, {
-        firstname: "Nick",
-        lastname: "Bernadini",
-        email: "nick@email.com",
-        phone: +12343343232,
-        summary: "a call was made",
-        url: "http:url.com",
-        transcript: "Testing",
-      });
-      console.log(result);
-      res.send("done");
+      try {
+        // Fetch data from the ContactModel
+        const contacts = await contactModel.find({agentId:"agent_07ff7f6c39540e4e71a5c71385", isDeleted:false, isOnDNCList:false}).populate("referenceToCallId").limit(10) // Fetch all contacts
+        if (!contacts || contacts.length === 0) {
+          return res.status(404).send("No contacts found in the database.");
+        }
+        
+
+        // Prepare data for Make.com
+        const data = contacts.map((contact) => ({
+          firstname: contact.firstname,
+          lastname: contact?.lastname ||"",
+          email: contact.email,
+          phone: contact.phone,
+          summary: contact.referenceToCallId?.retellCallSummary || "",
+          url: contact.referenceToCallId?.recordingUrl ||"",
+          transcript: contact.referenceToCallId?.transcript||"",
+        }));
+
+        // Ensure the Make webhook URL is defined
+        const webhookUrl = process.env.MAKE_URL_FOR_GHL;
+        if (!webhookUrl) {
+          return res.status(500).send("Make URL is not defined in the environment variables.");
+        }
+
+        // Send data to Make
+        const result = await axios.post(webhookUrl, { data }, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        console.log("Response from Make:", result.data);
+
+        // Respond to the client
+        res.status(200).send("Data sent to Make successfully!");
+      } catch (error) {
+        console.error("Error sending data to Make:", error);
+        res.status(500).send("Failed to send data to Make.");
+      }
     });
   }
+
   testingCalendly() {
     this.app.post("/test-calender", async (req: Request, res: Response) => {
       const eventTypeSlug = "test-event-type";
@@ -3135,7 +3168,7 @@ export class Server {
   }
   secondscript() {
     this.app.post("/script1", async (req: Request, res: Response) => {
-      const result = await script();
+      const result = await script(req.body.jobid);
       res.send(result);
     });
   }
