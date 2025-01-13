@@ -123,6 +123,16 @@ class CallService extends RootService {
                     { callId: call_id, agentId: agent_id },
                     { dial_status: callstatusenum.IN_PROGRESS }
                 );
+
+                const new_event = await EventModel.create({
+                    callId: call_id,
+                    agentId: agent_id
+                });
+
+                if (!new_event._id) {
+                    console.log("Error creating new event model");
+                };
+
             } else {
                 console.error("Event must be call_started: ", event);
             }            
@@ -287,7 +297,7 @@ class CallService extends RootService {
                 await updateStatsByHour(agent_id, todayString, timestamp);
 
 
-                console.log("ebded event: ", ended_data_update);
+                console.log("ended event: ", ended_data_update);
                 const updateData: any = {
                     dial_status: callStatus,
                     $push: {
