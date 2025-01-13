@@ -5,10 +5,14 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
+import fs from "fs";
+import { IContact } from "../utils/types";
+import csvParser from "csv-parser";
+import { formatPhoneNumber } from "../utils/formatter";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -286,6 +290,112 @@ class ClientService extends RootService {
         } catch (error) {
             console.error("Error fetching call history: ", error);
             next(error);
+        };
+    };
+
+    async upload_csv(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            if (!req.file) return res.status(500).json({ message: "No file found" });
+            const body = req.body;
+
+            const { error } = UploadCSVSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+            
+            const csvFile = req.file;
+            const { agentId, tag } = body;
+            const lowerCaseTag = typeof tag === "string" ? tag.toLowerCase() : "";
+        
+            const requiredHeaders = ["firstname", "lastname", "phone", "email"];
+            const uniqueRecordsMap = new Map<string, IContact>();
+            const failedContacts: any[] = [];
+            const duplicateKeys = new Set<string>();
+
+            fs.createReadStream(csvFile.path)
+                .pipe(csvParser())
+                .on("headers", (headers) => {
+                    const missing_headers = requiredHeaders.filter((header)  => !headers.includes(header.trim().toLowerCase()));
+
+                    if (missing_headers.length > 0) return res.status(100).json({
+                        message: "CSV must contain the followin headers; firstname, lastname, phone, and email"
+                    })
+                })
+                .on("data", (row) => {
+                    const { firstname, lastname, email, phone, address } = row;
+
+                    if (firstname && phone) {
+                        const formattedPhone = formatPhoneNumber(phone);
+
+                        if (uniqueRecordsMap.has(formattedPhone)) {
+                            duplicateKeys.add(formattedPhone);
+                            failedContacts.push({ row, reason: "duplicate" });
+                        } else {
+                            uniqueRecordsMap.set(formattedPhone, {
+                                firstname,
+                                lastname,
+                                phone: formattedPhone,
+                                email,
+                                address: address || ""
+                            });
+                        };
+                    } else {
+                        failedContacts.push({ row, reason: "missing required fields" });
+                    };
+                })
+                .on("end", async() => {
+                    const uniqueUsersToInsert = Array.from(uniqueRecordsMap.values()).filter(
+                        (user) => !duplicateKeys.has(user.phone)
+                    );
+
+                    const dncList: string[] = [""];
+                    const usersWithAgentId = uniqueUsersToInsert.map((user) => ({
+                        ...user,
+                        agentId: agentId,
+                        lowerCaseTag,
+                        isOnDNCList: dncList.includes(user.phone),
+                    }));
+
+                    const phoneNumbersToCheck = usersWithAgentId.map((user) => user.phone);
+                    const existingUsers = await contactModel.find({
+                        isDeleted: false,
+                        phone: { $in: phoneNumbersToCheck },
+                    });
+
+                    const dbDuplicates = existingUsers;
+                    const existingPhoneNumbers = new Set(
+                        existingUsers.map((user) => user.phone)
+                    );
+
+                    const finalUsersToInsert = usersWithAgentId.filter(
+                        (user) => !existingPhoneNumbers.has(user.phone) && user.phone
+                    );
+        
+                    if (finalUsersToInsert.length > 0) {
+                        console.log("Inserting users:", finalUsersToInsert);
+                        await contactModel.bulkWrite(
+                            finalUsersToInsert.map((user) => ({
+                            insertOne: { document: user },
+                            }))
+                        );
+                        await userModel.updateOne(
+                            { "agents.agentId": agentId },
+                            { $addToSet: { "agents.$.tag": lowerCaseTag } }
+                        );
+                    };
+
+                    res.status(200).json({
+                        message: `Upload successful, contacts uploaded: ${finalUsersToInsert.length}`,
+                        duplicates: dbDuplicates,
+                        failedContacts
+                    });
+                })
+                .on("error", (err) => {
+                    console.error("Error processing CSV: ", err);
+                    res.status(500).json({ message: "Failed to process CSV data" });
+                });
+                
+        } catch (e) {
+            console.error("Error uploading csv file: ", e);
+            next(e);
         };
     };
 };

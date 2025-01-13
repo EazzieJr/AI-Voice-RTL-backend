@@ -11,3 +11,8 @@ export const CallHistorySchema = Joi.object({
     startDate: Joi.date(),
     endDate: Joi.date()
 });
+
+export const UploadCSVSchema = Joi.object({
+    tag: Joi.string().required(),
+    agentId: Joi.string().required()
+})
