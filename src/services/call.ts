@@ -251,7 +251,7 @@ class CallService extends RootService {
                     callStatus = callstatusenum.CALLED;
                 };
 
-                console.log("dial: ", callStatus);
+                // console.log("dial: ", callStatus);
 
                 const callData = {
                     callId: call_id,
@@ -281,7 +281,7 @@ class CallService extends RootService {
                     dial_status: callStatus,
                 };
 
-                console.log("callData: ", callData);
+                // console.log("callData: ", callData);
 
                 const history_update = await callHistoryModel.findOneAndUpdate(
                     { callId: call_id, agentId: agent_id },
@@ -289,11 +289,14 @@ class CallService extends RootService {
                     { returnOriginal: false }
                 );
 
-                console.log("resu: ", history_update);
+                // console.log("resu: ", history_update);
 
                 const jobId_from_retell = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id : null;
 
                 let statResults;
+
+                console.log("today: ", todayString);
+                console.log("jobId: ", jobId_from_retell);
 
                 statResults = await DailyStatsModel.findOneAndUpdate(
                     { day: todayString, agentId: agent_id, jobProcessedBy: jobId_from_retell },
@@ -306,7 +309,7 @@ class CallService extends RootService {
                 await updateStatsByHour(agent_id, todayString, timestamp);
 
 
-                console.log("ended event: ", ended_data_update);
+                // console.log("ended event: ", ended_data_update);
                 const updateData: any = {
                     dial_status: callStatus,
                     $push: {
