@@ -10,7 +10,7 @@ const authenticate = AuthMiddleware.authenticate;
 router
     .get("/dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.dashboard_stats(req, res, next))
 
-    .get("/history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.call_history(req, res, next))
+    .post("/history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.call_history(req, res, next))
 
     .post("/upload-csv", 
         // authenticate,

@@ -286,6 +286,8 @@ class CallService extends RootService {
 
                 await updateStatsByHour(agent_id, todayString, timestamp);
 
+
+                console.log("ebded event: ", ended_data_update);
                 const updateData: any = {
                     dial_status: callStatus,
                     $push: {

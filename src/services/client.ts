@@ -350,7 +350,7 @@ class ClientService extends RootService {
                     const usersWithAgentId = uniqueUsersToInsert.map((user) => ({
                         ...user,
                         agentId: agentId,
-                        lowerCaseTag,
+                        tag: lowerCaseTag,
                         isOnDNCList: dncList.includes(user.phone),
                     }));
 

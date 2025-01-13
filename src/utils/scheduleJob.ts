@@ -203,7 +203,7 @@ export const scheduleCronJob = async (
                         const { call_id } = create_call;
 
                         const update_callId = await contactModel.updateOne(
-                            contact._id,
+                            { _id: contact._id},
                             {
                                 callId: call_id,
                                 $push: {
