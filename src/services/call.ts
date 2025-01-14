@@ -304,6 +304,8 @@ class CallService extends RootService {
                     { returnOriginal: false }
                 );
 
+                console.log("update: ", statResults);
+
                 const timestamp = new Date();
 
                 await updateStatsByHour(agent_id, todayString, timestamp);
@@ -331,7 +333,7 @@ class CallService extends RootService {
                     { $set: updateData }
                 );
 
-                console.log("updat: ", update_contact);
+                // console.log("updat: ", update_contact);
                 
             } else {
                 console.error("Event must be call_ended: ", event);
