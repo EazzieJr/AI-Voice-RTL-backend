@@ -1626,8 +1626,8 @@ export class Server {
         }
 
         const data = results.map((history) => ({
-          firstname: history.firstname || "",
-          lastname: history.lastname || "",
+          firstName: history.firstname || "",
+          lastName: history.lastname || "",
           email: history.email || "",
           phone: history.phone || "",
           dial_status: history.dial_status || "",
