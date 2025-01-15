@@ -3831,6 +3831,8 @@ export class Server {
               agentId: { $in: agentIds },
             });
 
+            console.log("stats: ", stats);
+
             const monthlyData = Array(12)
               .fill(0)
               .map((_, monthIndex) => {

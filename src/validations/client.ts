@@ -15,4 +15,4 @@ export const CallHistorySchema = Joi.object({
 export const UploadCSVSchema = Joi.object({
     tag: Joi.string().required(),
     agentId: Joi.string().required()
-})
+});

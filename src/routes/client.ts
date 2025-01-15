@@ -17,4 +17,6 @@ router
         upload.single("csvFile"),
         (req: AuthRequest, res: Response, next: NextFunction) => client_service.upload_csv(req, res, next))
 
+    .post("/graph", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.graph_chart(req, res, next))
+
 export default router; 

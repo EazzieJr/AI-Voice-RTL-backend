@@ -13,6 +13,8 @@ import fs from "fs";
 import { IContact } from "../utils/types";
 import csvParser from "csv-parser";
 import { formatPhoneNumber } from "../utils/formatter";
+import { DateTime } from "luxon";
+import { dailyGraphModel } from "../models/graphModel";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -403,6 +405,160 @@ class ClientService extends RootService {
                 
         } catch (e) {
             console.error("Error uploading csv file: ", e);
+            next(e);
+        };
+    };
+
+    async graph_chart(req: AuthRequest, res: Response, next: NextFunction): Promise<Response>{
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = DashboardSchema.validate(body, {
+                abortEarly: false
+            });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const dateOption = req.body.dateOption as DateOption;
+            const { agentIds } = body;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            if (!Object.values(DateOption).includes(dateOption)) {
+                return res.status(400).json({ error: "Invalid date option" })
+            };
+
+            const selectedDateOption = dateOption;
+            const timeZone = "America/Los_Angeles";
+
+            const createHourlyTemplate = () => 
+                Array.from({ length: 7 }, (_, i) => ({
+                    x: `${(9 + i).toString().padStart(2, "0")}:00`,
+                    y: 0
+                }));
+            
+            const sumHourlyCalls = (hourlyCalls: Map<string, number>, start = 9, end = 15) => 
+                Array.from(hourlyCalls.entries())
+                    .filter(([hour]) => {
+                    const hourInt = parseInt(hour.split(":")[0], 10);
+                    return hourInt >= start && hourInt < end;
+                    })
+                    .reduce((sum, [, count]) => sum + count, 0);
+        
+            const getWeekDays = (startDay: DateTime) => 
+                Array.from({ length: 7 }, (_, i) => startDay.minus({ days: i }).toISODate()).reverse();
+            
+            // Fetching data based on DateOption;
+            let response: any[];
+
+            if (selectedDateOption === DateOption.Today) {
+                console.log("hello: I am here");
+                const today = DateTime.now().setZone(timeZone).startOf("day").toISODate();
+
+                const stats = await dailyGraphModel.find({
+                    agentId: { $in: agentIds },
+                    date: today
+                });
+
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and day" });
+                };
+
+                const aggregatedCalls = stats.reduce((acc, stat) => {
+                    const hourlyCalls = stat.hourlyCalls as Map<string, number>;
+                    hourlyCalls.forEach((count, hour) => {
+                        if (!acc[hour]) acc[hour] = 0;
+                        acc[hour] += count;
+                    });
+                    return acc;
+                }, {} as { [hour: string]: number });
+
+                response = createHourlyTemplate().map((entry) => ({
+                    ...entry,
+                    y: aggregatedCalls[entry.x] || 0
+                }));
+            } else if (selectedDateOption === DateOption.ThisWeek) {
+                const startDay = DateTime.now().setZone(timeZone).startOf("day");
+                const weekDays: string[] = getWeekDays(startDay);
+
+                const stats = await dailyGraphModel.find({
+                    agentId: { $in: agentIds },
+                    date: { $in: weekDays }
+                });
+
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                };
+
+                response = weekDays.map((day) => {
+                    const dayStats = stats.filter((stat) => stat.date === day);
+                    const dailySum = dayStats.reduce((sum, stat) => sum + sumHourlyCalls(stat.hourlyCalls), 0);
+
+                    const dayName = DateTime.fromISO(day, { zone: timeZone }).toLocaleString({ weekday: "long" });
+
+                    return { x: dayName, y: dailySum || 0 };
+                });
+            } else if (selectedDateOption === DateOption.ThisMonth) {
+                const stats = await dailyGraphModel.find({ agentId: { $in: agentIds } });
+                console.log("month: ", stats);
+
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                };
+
+                response = Array.from({ length: 12 }, (_, i) => {
+                    const monthStats = stats.filter(
+                        (stat) => DateTime.fromISO(stat.date).month === i + 1
+                    );
+                    const monthlySum = monthStats.reduce((sum, stat) => sum + sumHourlyCalls(stat.hourlyCalls), 0);
+
+                    const monthName = DateTime.fromObject({ month: i + 1 }).toLocaleString({ month: "long" });
+                    
+                    return { x: monthName, y: monthlySum };
+                });
+            } else if (selectedDateOption === DateOption.LAST_SCHEDULE) {
+                const lastStat = await dailyGraphModel
+                    .findOne({ agentId: { $in: agentIds } })
+                    .sort({ date: -1 });
+
+                if (!lastStat) {
+                    response = createHourlyTemplate();
+                } else  {
+                    const stats = await dailyGraphModel.find({
+                        agentId: { $in: agentIds },
+                        date: lastStat.date,
+                    });
+
+                    if (stats.length === 0) {
+                        return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                    };
+
+                    const aggregatedCalls = stats.reduce((acc, stat) => {
+                        const hourlyCalls = stat.hourlyCalls as Map<string, number>;
+                        hourlyCalls.forEach((count, hour) => {
+                            if (!acc[hour]) acc[hour] = 0;
+                            acc[hour] += count;
+                        });
+                        return acc;
+                    }, {} as { [hour: string]: number });
+
+                    response = createHourlyTemplate().map((entry) => ({
+                        ...entry,
+                        y: aggregatedCalls[entry.x] || 0,
+                    }));
+                };
+            } else {
+                return res.status(400).json({ error: "Invalid dateOption" });
+            };
+
+            return res.status(200).json({
+                success: true,
+                response
+            });
+
+        } catch (e) {
+            console.error("Error fetching client graph" + e);
             next(e);
         };
     };
