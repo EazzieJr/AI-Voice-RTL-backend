@@ -1627,7 +1627,7 @@ export class Server {
           totalRecords = await contactModel.countDocuments(query);
           totalPages = Math.ceil(totalRecords / limit);
 
-          console.log(query);
+          console.log("this is query", query);
           results = await contactModel
             .find(query)
             .populate("referenceToCallId")
