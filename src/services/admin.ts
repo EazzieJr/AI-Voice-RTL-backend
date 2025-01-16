@@ -3,6 +3,7 @@ import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/authRequest";
 import { SearchClientSchema } from "../validations/admin";
 import { contactModel } from "../models/contact_model";
+import { IContact } from "../utils/types";
 
 
 class AdminService extends RootService {
@@ -137,6 +138,10 @@ class AdminService extends RootService {
                     }
                 ]);
 
+                if (result[0].results.length === 0) {
+                    return res.status(200).json({ message: "No data found for your search params"});
+                };
+
                 totalRecords = result[0].totalRecords[0].count;
                 results = result[0].results;
 
@@ -174,6 +179,10 @@ class AdminService extends RootService {
                     }
                 ]);
 
+                if (result[0].results.length === 0) {
+                    return res.status(200).json({ message: "No data found for your search params"});
+                };
+
                 totalRecords = result[0].totalRecords[0].count;
                 results = result[0].results;
 
@@ -181,12 +190,30 @@ class AdminService extends RootService {
 
             };
 
+            const data = results.map((contact: IContact) => ({
+                callId: contact.callId || "",
+                firstName: contact.firstname,
+                lastName: contact.lastname,
+                email: contact.email,
+                phone: contact.phone,
+                agentId: contact.agentId,
+                dial_status: contact.dial_status,
+                address: contact.address,
+                transcript: contact.referenceToCallId?.transcript,
+                summary: contact.referenceToCallId?.retellCallSummary,
+                status: contact.referenceToCallId?.retellCallStatus,
+                duration: contact.referenceToCallId?.duration,
+                sentiment: contact.referenceToCallId?.analyzedTranscript,
+                timestamp: contact.referenceToCallId?.timestamp,
+                recording: contact.referenceToCallId?.recordingUrl
+            }));
+
             return res.status(200).json({
                 page,
                 limit,
                 totalRecords,
                 totalPages,
-                results,
+                results: data,
             });
             
         } catch (e) {
