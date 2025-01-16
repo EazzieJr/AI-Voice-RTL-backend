@@ -70,12 +70,6 @@ class AdminService extends RootService {
                 query["tag"] == tag.toLowerCase();
             };
 
-            const sentimentStatus = sentimentOption ? AdminService.getSentimentStatus(sentimentOption): undefined;
-            console.log("sentime: ", sentimentStatus);
-
-            const timeZone = "America/Los_Angeles"; // PST time zone
-            const now = new Date();
-
             if (startDate || endDate) {
                 query["datesCalled"] = {};
 
@@ -150,14 +144,41 @@ class AdminService extends RootService {
                 const startIndex = (page - 1) * limit;
                 results = results.slice(startIndex, startIndex + limit);
             } else {
-                totalRecords = await contactModel.countDocuments(query);
+
+                const result = await contactModel.aggregate([
+                    {
+                        $match: query
+                    },
+                    {
+                        $lookup: {
+                            from: "transcripts",
+                            localField: "referenceToCallId",
+                            foreignField: "_id",
+                            as: "referenceToCallId"
+                        }
+                    },
+                    {
+                        $unwind: {
+                            path: "$referenceToCallId",
+                            preserveNullAndEmptyArrays: true
+                        }
+                    },
+                    {
+                        $facet: {
+                            "totalRecords": [{ "$count": "count"}],
+                            "results": [
+                              { "$skip": (page - 1) * limit},
+                              { "$limit": limit }
+                            ]
+                        }
+                    }
+                ]);
+
+                totalRecords = result[0].totalRecords[0].count;
+                results = result[0].results;
+
                 totalPages = Math.ceil(totalRecords / limit);
 
-                results = await contactModel
-                    .find(query)
-                    .populate("referenceToCallId")
-                    .skip((page - 1) * limit)
-                    .limit(limit);
             };
 
             return res.status(200).json({
