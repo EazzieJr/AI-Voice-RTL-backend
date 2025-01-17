@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -609,6 +609,45 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error fetching single campaign from smart-lead: " + e);
+            next(e);
+        };
+    };
+
+    async single_campaign_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = CampaignStatisticsSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const { campaignId, limit, email_status, startDate, endDate } = body;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+            
+            const baseUrl = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/statistics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const queryParams = [];
+
+            if (limit) queryParams.push(`limit=${limit}`);
+            if (email_status) queryParams.push(`email_status=${email_status}`);
+            if (startDate) queryParams.push(`sent_time_start_date=${startDate}`);
+            if (endDate) queryParams.push(`sent_time_end_date=${endDate}`);
+
+            const url = queryParams.length ? `${baseUrl}&${queryParams.join('&')}` : baseUrl;
+
+            const campaign = await axios.get(url);
+
+            const result = campaign.data;
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching single campaign stats from smart lead: " + e);
             next(e);
         };
     };

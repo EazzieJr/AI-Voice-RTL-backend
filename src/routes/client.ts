@@ -23,4 +23,6 @@ router
 
     .get("/campaign", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.single_campaign(req, res, next))
 
+    .post("/campaign-statistics", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.single_campaign_stats(req, res, next))
+
 export default router; 

@@ -16,3 +16,11 @@ export const UploadCSVSchema = Joi.object({
     tag: Joi.string().required(),
     agentId: Joi.string().required()
 });
+
+export const CampaignStatisticsSchema = Joi.object({
+    campaignId: Joi.string().required(),
+    limit: Joi.number(),
+    email_status: Joi.string(),
+    startDate: Joi.date(),
+    endDate: Joi.date()
+});
