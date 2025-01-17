@@ -586,6 +586,32 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
+    async single_campaign(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "Campaignid is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const result = campaign.data;
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching single campaign from smart-lead: " + e);
+            next(e);
+        };
+    };
 };
 
 export const client_service = new ClientService();

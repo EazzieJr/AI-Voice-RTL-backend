@@ -21,4 +21,6 @@ router
 
     .get("/all-campaigns", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.all_campaigns(req, res, next))
 
+    .get("/campaign", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.single_campaign(req, res, next))
+
 export default router; 
