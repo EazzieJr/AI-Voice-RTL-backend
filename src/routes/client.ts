@@ -19,4 +19,6 @@ router
 
     .post("/graph", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.graph_chart(req, res, next))
 
+    .get("/all-campaigns", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.all_campaigns(req, res, next))
+
 export default router; 

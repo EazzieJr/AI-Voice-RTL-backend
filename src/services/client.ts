@@ -15,6 +15,7 @@ import csvParser from "csv-parser";
 import { formatPhoneNumber } from "../utils/formatter";
 import { DateTime } from "luxon";
 import { dailyGraphModel } from "../models/graphModel";
+import axios from "axios";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -559,6 +560,29 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error fetching client graph" + e);
+            next(e);
+        };
+    };
+
+    async all_campaigns(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaigns = await axios.get(url);
+            const result = campaigns.data;
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+    
+        } catch (e) {
+            console.error('Error fetching all campaigns from smart lead: ' + e);
             next(e);
         };
     };
