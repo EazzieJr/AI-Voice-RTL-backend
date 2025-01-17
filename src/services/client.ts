@@ -592,7 +592,7 @@ class ClientService extends RootService {
             const clientId = req.user._id;
             const campaignId = req.query.campaignId;
 
-            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "Campaignid is required" });
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
@@ -648,6 +648,32 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error fetching single campaign stats from smart lead: " + e);
+            next(e);
+        };
+    };
+
+    async single_campaign_analytics(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const result = campaign.data;
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching sinle campaign analytics: " + e);
             next(e);
         };
     };
