@@ -695,6 +695,13 @@ class ClientService extends RootService {
             const page_to_use = parseInt(page) || 1;
             const startIndex = (page_to_use - 1) * limit;
             const endIndex = page_to_use * limit;
+            const totalPages = Math.ceil(all_campaigns.length / limit);
+
+            if (page_to_use > totalPages) {
+                return res.status(400).json({
+                    error: "Page exceeds available data"
+                });
+            };
 
             const campaignsToFetch = all_campaigns.slice(startIndex, endIndex);
 
@@ -715,7 +722,7 @@ class ClientService extends RootService {
                 success: true,
                 result,
                 page: page_to_use,
-                totalPages: Math.ceil(all_campaigns.length / limit)
+                totalPages
             });
 
         } catch (e) {
