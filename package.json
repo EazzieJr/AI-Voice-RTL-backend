@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=production nodemon src/index.ts",
-    "start": "node dist/index.js",
+    "build": "npm install && tsc",
+    "start": "cross-env NODE_ENV=production node dist/index.js",
     "start-dev": "cross-env NODE_ENV=development node dist/index.js",
-    "build": "tsc",
     "pm2-start": "NODE_ENV=production pm2 start dist/index.js -i max --name retel-server --watch --ignore-watch=node_modules",
     "pm2-stop": "pm2 stop retel-server",
     "pm2-monitor": "pm2 monit",
