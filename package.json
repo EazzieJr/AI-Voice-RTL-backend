@@ -58,6 +58,7 @@
     "retell-sdk": "^4.6.0",
     "smee-client": "^2.0.1",
     "twilio": "^4.21.0",
+    "typescript": "^5.7.3",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
@@ -80,7 +81,6 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.3",
     "wrangler": "^3.51.0"
   }
 }
