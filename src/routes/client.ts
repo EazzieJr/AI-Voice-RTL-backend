@@ -29,4 +29,6 @@ router
 
     .get("/all-campaign-analytics", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.all_campaign_analytics(req, res, next))
 
+    .get("/lead-msg-history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.fetch_message_history(req, res, next))
+
 export default router; 

@@ -576,6 +576,8 @@ class ClientService extends RootService {
             const campaigns = await axios.get(url);
             const result = campaigns.data;
 
+            if (!result) return res.status(400).json({ message: "all stats not found"});
+
             return res.status(200).json({
                 success: true,
                 result
@@ -601,6 +603,8 @@ class ClientService extends RootService {
 
             const campaign = await axios.get(url);
             const result = campaign.data;
+
+            if (!result) return res.status(400).json({ message: "stats not found"});
 
             return res.status(200).json({
                 success: true,
@@ -641,6 +645,8 @@ class ClientService extends RootService {
 
             const result = campaign.data;
 
+            if (!result) return res.status(400).json({ message: "history not found"});
+
             return res.status(200).json({
                 success: true,
                 result
@@ -667,6 +673,8 @@ class ClientService extends RootService {
             const campaign = await axios.get(url);
             const result = campaign.data;
 
+            if (!result) return res.status(400).json({ message: "history not found"});
+
             return res.status(200).json({
                 success: true,
                 result
@@ -690,6 +698,8 @@ class ClientService extends RootService {
 
             const campaign = await axios.get(url);
             const all_campaigns = campaign.data;
+
+            if (!all_campaigns) return res.status(400).json({ message: "Analytics not found"});
 
             const limit = 15;
             const page_to_use = parseInt(page) || 1;
@@ -727,6 +737,43 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error fetching all campaign analytics: " + e);
+            next(e);
+        };
+    };
+
+    async fetch_message_history(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+            const lead_id = req.query.lead_id;
+            const date = req.query.date;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
+
+            if (lead_id === null || lead_id === undefined || !lead_id) return res.status(400).json({ message: "LeadId is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            let url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads/${lead_id}/message-history?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            if (date) {
+                url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads/${lead_id}/message-history?api_key=${process.env.SMART_LEAD_API_KEY}&event_time_gt=${date}`;
+            };
+
+            const campaign = await axios.get(url);
+
+            const result = campaign.data;
+
+            if (!result) return res.status(400).json({ message: "history not found"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching message history from smartlead: " + e);
             next(e);
         };
     };
