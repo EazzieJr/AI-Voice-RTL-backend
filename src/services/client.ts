@@ -677,6 +677,52 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
+    async all_campaign_analytics(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const page = req.query.page as string;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const all_campaigns = campaign.data;
+
+            const limit = 15;
+            const page_to_use = parseInt(page) || 1;
+            const startIndex = (page_to_use - 1) * limit;
+            const endIndex = page_to_use * limit;
+
+            const campaignsToFetch = all_campaigns.slice(startIndex, endIndex);
+
+            let result: Object[] = [];
+
+            for (const campaign of campaignsToFetch) {
+                const { id } = campaign;
+
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+                const analytics = await axios.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                
+                result.push(campaign_analytics);
+            };
+
+            return res.status(200).json({
+                success: true,
+                result,
+                page: page_to_use,
+                totalPages: Math.ceil(all_campaigns.length / limit)
+            });
+
+        } catch (e) {
+            console.error("Error fetching all campaign analytics: " + e);
+            next(e);
+        };
+    };
 };
 
 export const client_service = new ClientService();

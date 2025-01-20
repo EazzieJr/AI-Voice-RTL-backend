@@ -27,4 +27,6 @@ router
 
     .get("/campaign-analytics", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.single_campaign_analytics(req, res, next))
 
+    .get("/all-campaign-analytics", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.all_campaign_analytics(req, res, next))
+
 export default router; 
