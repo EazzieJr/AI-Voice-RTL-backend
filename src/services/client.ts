@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -774,6 +774,45 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error fetching message history from smartlead: " + e);
+            next(e);
+        };
+    };
+
+    async forward_email(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = ForwardReplySchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { campaignId, message_id, stats_id, to_emails } = body;
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/forward-email?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.post(url, {
+                message_id,
+                stats_id,
+                to_emails
+            });
+
+            console.log("campa: ", campaign);
+
+            const result = campaign.data;
+            console.log("result: ", result);
+
+            if (!result) return res.status(400).json({ message: "unable to forward message"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error forwarding reply via smartlead: " + e);
             next(e);
         };
     };

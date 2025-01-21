@@ -31,4 +31,6 @@ router
 
     .get("/lead-msg-history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.fetch_message_history(req, res, next))
 
+    .post("/forward-email", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.forward_email(req, res, next))
+
 export default router; 

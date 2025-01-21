@@ -24,3 +24,10 @@ export const CampaignStatisticsSchema = Joi.object({
     startDate: Joi.date(),
     endDate: Joi.date()
 });
+
+export const ForwardReplySchema = Joi.object({
+    campaignId: Joi.string().required(),
+    message_id: Joi.string().required(),
+    stats_id: Joi.string().required(),
+    to_emails: Joi.string().required()
+})
