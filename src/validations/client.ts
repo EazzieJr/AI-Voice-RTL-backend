@@ -30,4 +30,4 @@ export const ForwardReplySchema = Joi.object({
     message_id: Joi.string().required(),
     stats_id: Joi.string().required(),
     to_emails: Joi.string().required()
-})
+});

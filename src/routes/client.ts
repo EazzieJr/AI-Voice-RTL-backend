@@ -33,4 +33,6 @@ router
 
     .post("/forward-email", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.forward_email(req, res, next))
 
+    .get("/list-leads", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.list_leads(req, res, next))
+
 export default router; 
