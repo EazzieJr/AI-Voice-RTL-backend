@@ -694,18 +694,55 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                console.log("hello here");
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+
+            const { id } = foundClient;
+
             const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
 
             const campaign = await axios.get(url);
             const all_campaigns = campaign.data;
 
-            if (!all_campaigns) return res.status(400).json({ message: "Analytics not found"});
+            if (!all_campaigns) return res.status(400).json({ message: "No Analytics not found"});
+
+            const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id);
 
             const limit = 15;
             const page_to_use = parseInt(page) || 1;
             const startIndex = (page_to_use - 1) * limit;
             const endIndex = page_to_use * limit;
-            const totalPages = Math.ceil(all_campaigns.length / limit);
+            const totalPages = Math.ceil(client_campaigns.length / limit);
+
 
             if (page_to_use > totalPages) {
                 return res.status(400).json({
@@ -713,7 +750,7 @@ class ClientService extends RootService {
                 });
             };
 
-            const campaignsToFetch = all_campaigns.slice(startIndex, endIndex);
+            const campaignsToFetch = client_campaigns.slice(startIndex, endIndex);
 
             let result: Object[] = [];
 
