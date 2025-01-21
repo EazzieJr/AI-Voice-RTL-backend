@@ -35,4 +35,6 @@ router
 
     .get("/list-leads", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.list_leads(req, res, next))
 
+    .post("/reply-lead", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.reply_lead(req, res, next))
+
 export default router; 

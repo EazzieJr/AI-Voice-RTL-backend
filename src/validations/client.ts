@@ -31,3 +31,17 @@ export const ForwardReplySchema = Joi.object({
     stats_id: Joi.string().required(),
     to_emails: Joi.string().required()
 });
+
+export const ReplyLeadSchema = Joi.object({
+    campaignId: Joi.string().required(),
+    email_body: Joi.string(),
+    reply_message_id: Joi.string(),
+    reply_email_time: Joi.string(),
+    reply_email_body: Joi.string(),
+    cc: Joi.string(),
+    bcc: Joi.string(),
+    add_signature: Joi.boolean(),
+    to_first_name: Joi.string(),
+    to_last_name: Joi.string(),
+    to_email: Joi.string()
+});
