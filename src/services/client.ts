@@ -9,7 +9,7 @@ import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatistics
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
-import fs from "fs";
+import fs, { stat } from "fs";
 import { IContact } from "../utils/types";
 import csvParser from "csv-parser";
 import { formatPhoneNumber } from "../utils/formatter";
@@ -716,7 +716,6 @@ class ClientService extends RootService {
             };
             
             if (name === "Legacy Alliance Club") {
-                console.log("hello here");
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
             } else if (name === "Cory Lopez-Warfield") {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
@@ -928,6 +927,153 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error replying email lead: " + e);
+            next(e);
+        };
+    };
+
+    async campaign_dashboard(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+
+            const { id } = foundClient;
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const all_campaigns = campaign.data;
+
+            if (!all_campaigns) return res.status(400).json({ message: "No Analytics not found"});
+
+            const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id);
+
+            let result: Object[] = [];
+
+            for (const campaign of client_campaigns) {
+                const { id } = campaign;
+
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+                const analytics = await axios.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                
+                result.push(campaign_analytics);
+            };
+            
+            interface CampaignObject {
+                id: number,
+                user_id: number,
+                created_at: string,
+                status: string,
+                name: string,
+                sent_count: string,
+                open_count: string,
+                click_count: string,
+                reply_count: string,
+                block_count: string,
+                total_count: string,
+                sequence_count: string,
+                drafted_count: string,
+                tags: any,
+                unique_sent_count: string,
+                unique_open_count: string,
+                unique_click_count: string,
+                client_id: number,
+                bounce_count: string,
+                parent_campaign_id: any,
+                unsubscribed_count: string,
+                campaign_lead_stats: {
+                    total: number,
+                    paused: number,
+                    blocked: number,
+                    revenue: number,
+                    stopped: number,
+                    completed: number,
+                    inprogress: number,
+                    interested: number,
+                    notStarted: number
+                },
+                team_member_id: any,
+                send_as_plain_text: boolean,
+                client_name: string,
+                client_email: string,
+                client_company_name: string
+            };
+
+            const summedValues: { [key: string]: number } = {};
+
+            const parent_keys = ["sent_count", "open_count", "click_count", "reply_count", "bounce_count"];
+            const stat_keys = ["total", "interested"];
+
+            parent_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+            stat_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+
+            (result as CampaignObject[]).forEach((campaign: CampaignObject) => {
+                parent_keys.forEach((key) => {
+                    summedValues[key] += parseInt(campaign[key as keyof CampaignObject] as string) || 0;
+                });
+                
+                stat_keys.forEach((key) => {
+                    summedValues[key] += campaign.campaign_lead_stats[key as keyof typeof campaign.campaign_lead_stats] || 0;
+                });
+            });
+
+            const dashboard = {
+                Total_Sent: summedValues.sent_count,
+                Replied: summedValues.reply_count,
+                Opened: summedValues.open_count,
+                Clicked: summedValues.click_count,
+                Positive_Reply: summedValues.interested,
+                Bounced: summedValues.bounce_count,
+                Contacts: summedValues.total
+            };
+
+            return res.status(200).json({
+                success: true,
+                result: {
+                    ...dashboard
+                }
+            });
+
+        } catch (e) {
+            console.error("Error fetching campaign dashboard: " + e);
             next(e);
         };
     };
