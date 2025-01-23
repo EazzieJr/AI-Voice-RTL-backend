@@ -45,3 +45,11 @@ export const ReplyLeadSchema = Joi.object({
     to_last_name: Joi.string(),
     to_email: Joi.string()
 });
+
+export const AddWebhookSchema = Joi.object({
+    campaignId: Joi.string().required(),
+    name: Joi.string().required(),
+    webhook_url: Joi.string().required(),
+    event_types: Joi.array().items(Joi.string()).required(),
+    webhook_categories: Joi.array().items(Joi.string()).required()
+});

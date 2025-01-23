@@ -41,4 +41,6 @@ router
 
     .get("/campaign-overview", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.campaign_overview(req, res, next))
 
+    .post("/add-webhook", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.add_webhook(req, res, next))
+
 export default router; 

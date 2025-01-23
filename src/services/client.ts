@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -1225,7 +1225,46 @@ class ClientService extends RootService {
             console.error("Error fetching campaign overview: " + e);
             next(e);
         };
-    }
+    };
+
+    async add_webhook(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = AddWebhookSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { campaignId, name, webhook_url, event_types, webhook_categories } = body;
+
+            const body_to_send = {
+                id: null as number | null,
+                name,
+                webhook_url,
+                event_types,
+                webhook_categories
+            };
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/webhooks?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const webhook = await axios.post(url, body_to_send);
+            const response = webhook.data;
+
+            if (response.ok !== "true") return res.status(400).json({ message: "unable to add webhook"});
+
+            return res.status(200).json({
+                success: true,
+                message: "successfully added webhook"
+            });
+            
+        } catch (e) {
+            console.error("Error adding webhook: " + e);
+            next(e);
+        };
+    };
 };
 
 export const client_service = new ClientService();
