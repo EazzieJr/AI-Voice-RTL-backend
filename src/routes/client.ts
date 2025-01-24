@@ -43,4 +43,6 @@ router
 
     .post("/add-webhook", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.add_webhook(req, res, next))
 
+    .get("/email-sent/webhook", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.email_sent_webhook(req, res, next))
+
 export default router; 

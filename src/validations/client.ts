@@ -51,5 +51,5 @@ export const AddWebhookSchema = Joi.object({
     name: Joi.string().required(),
     webhook_url: Joi.string().required(),
     event_types: Joi.array().items(Joi.string()).required(),
-    webhook_categories: Joi.array().items(Joi.string()).required()
+    categories: Joi.array().items(Joi.string()).required()
 });

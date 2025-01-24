@@ -16,6 +16,7 @@ import { formatPhoneNumber } from "../utils/formatter";
 import { DateTime } from "luxon";
 import { dailyGraphModel } from "../models/graphModel";
 import axios from "axios";
+import { WebhookModel } from "../models/webhook";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -1238,14 +1239,14 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { campaignId, name, webhook_url, event_types, webhook_categories } = body;
+            const { campaignId, name, webhook_url, event_types, categories } = body;
 
             const body_to_send = {
                 id: null as number | null,
                 name,
                 webhook_url,
                 event_types,
-                webhook_categories
+                categories
             };
 
             const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/webhooks?api_key=${process.env.SMART_LEAD_API_KEY}`;
@@ -1253,15 +1254,35 @@ class ClientService extends RootService {
             const webhook = await axios.post(url, body_to_send);
             const response = webhook.data;
 
-            if (response.ok !== "true") return res.status(400).json({ message: "unable to add webhook"});
+            if (response.ok !== true) return res.status(400).json({ message: "unable to add webhook"});
 
             return res.status(200).json({
                 success: true,
-                message: "successfully added webhook"
+                result: response
             });
-            
+
         } catch (e) {
             console.error("Error adding webhook: " + e);
+            next(e);
+        };
+    };
+
+    async email_sent_webhook(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const body = req.body;
+
+            console.log("email sent webhook: ", body);
+
+            const log = new WebhookModel(body);
+            await log.save();
+
+            return res.status(200).json({
+                success: true,
+                message: "email sent webhook received",
+            });
+
+        } catch (e) {
+            console.error("Error receiving email sent webhook: " + e);
             next(e);
         };
     };
