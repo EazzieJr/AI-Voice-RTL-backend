@@ -45,4 +45,6 @@ router
 
     .get("/email-sent/webhook", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.email_sent_webhook(req, res, next))
 
+    .post("/agent", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.fetch_agent_data(req, res, next))
+
 export default router; 

@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -1283,6 +1283,181 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error receiving email sent webhook: " + e);
+            next(e);
+        };
+    };
+
+    async fetch_agent_data(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = AgentDataSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { agentId } = body;
+            const dateOption = req.body.dateOption as DateOption;
+
+            let date_filter = {};
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = toZonedTime(now, timeZone);
+            const today = format(zonedNow, "yyyy-MM-dd", { timeZone });
+            const cur_now = DateTime.now().setZone("America/Los_Angeles");
+
+            const totalContacts = await contactModel.countDocuments({
+                agentId,
+                isDeleted: false
+            });
+
+            const totalNotCalled = await contactModel.countDocuments({
+                agentId,
+                isDeleted: false,
+                dial_status: callstatusenum.NOT_CALLED
+            });
+
+            switch (dateOption) {
+                case DateOption.Today:
+                    date_filter = { day: today };
+                    break;
+
+                case DateOption.Yesterday:
+                    const yest_zone = toZonedTime(subDays(now, 1), timeZone);
+                    const yesterday = format(yest_zone, "yyyy-MM-dd", { timeZone });
+                    date_filter = { day: yesterday };
+
+                    break;
+
+                case DateOption.ThisWeek:
+                    const weekdays: string[] = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = subDays(zonedNow, i);
+                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                        weekdays.push(valid_day);
+                    }
+                    date_filter = { day: { $in: weekdays } };
+
+                    break;
+
+                case DateOption.ThisMonth:
+                    const startOfMonth = cur_now.startOf("month");
+                    const todayDate = cur_now.startOf("day");
+
+                    const monthDates: string[] = [];
+                    let currentDate = startOfMonth;
+
+                    while (currentDate <= todayDate) {
+                        monthDates.push(currentDate.toFormat("yyyy-MM-dd"));
+
+                        currentDate = currentDate.plus({ days: 1 });
+                    };
+
+                    date_filter = { day: { $in: monthDates } };
+
+                    break;
+                
+                case DateOption.PastMonth:
+                    const startDate = cur_now.minus({ days: 30 }).startOf("day");
+
+                    const pastMonthDates: string[] = [];
+                    let currentDatePast = startDate;
+
+                    while (currentDatePast <= cur_now.startOf("day")) {
+                        pastMonthDates.push(currentDatePast.toFormat("yyyy-MM-dd"));
+                    
+                        currentDatePast = currentDatePast.plus({ days: 1 });
+                    };
+
+                    date_filter = { day: { $in: pastMonthDates } };
+
+                    break;
+
+                case DateOption.Total:
+                    date_filter = {};
+
+                    break;
+                
+                case DateOption.LAST_SCHEDULE:
+                    const recentJob = await jobModel
+                        .findOne({ agentId })
+                        .sort({ createdAt: -1 })
+                        .lean();
+
+                    if (recentJob) {
+                        const dateToCheck = recentJob.scheduledTime.split("T")[0];
+
+                        date_filter = { day: dateToCheck };
+
+                    } else {
+                        date_filter = {};
+                    };
+
+                    break;
+
+            };
+
+            const stats = await DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId,
+                        ...date_filter
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCalls: { $sum: "$totalCalls" },
+                        totalAnsweredByVm: { $sum: "$totalAnsweredByVm" },
+                        totalAppointment: { $sum: "$totalAppointment" },
+                        totalCallsTransffered: { $sum: "$totalTransffered" },
+                        totalFailedCalls: { $sum: "$totalFailed" },
+                        totalAnsweredCalls: { $sum: "$totalCallAnswered" },
+                        totalDialNoAnswer: { $sum: "$totalDialNoAnswer" },
+                        totalAnsweredByIVR: { $sum: "$totalAnsweredByIVR" },
+                        totalCallInactivity: { $sum: "$totalCallInactivity" },
+                        totalCallDuration: { $sum: "$totalCallDuration" },
+                    }
+                }
+            ]);
+
+            function convertMillisecondsToTime(milliseconds: number): string {
+                const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+                const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+              
+                const formattedHours = String(hours).padStart(2, '0');
+                const formattedMinutes = String(minutes).padStart(2, '0');
+                const formattedSeconds = String(seconds).padStart(2, '0');
+              
+                return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+            };
+
+            const milliseconds = stats[0]?.totalCallDuration || 0;
+
+            const combinedCallDuration = convertMillisecondsToTime(milliseconds);
+
+            const result = {
+                totalContacts,
+                totalCalls: stats[0]?.totalCalls || 0,
+                totalNotCalled,
+                totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
+                totalFailedCalls: stats[0]?.totalFailedCalls || 0,
+                totalAnsweredCalls: stats[0]?.totalAnsweredCalls || 0,
+                totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
+                totalCallsDuration: combinedCallDuration,
+                totalAppointments: stats[0]?.totalAppointment || 0
+            };
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching single agent stats" + e);
             next(e);
         };
     };

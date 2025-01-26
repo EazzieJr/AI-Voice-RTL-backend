@@ -53,3 +53,8 @@ export const AddWebhookSchema = Joi.object({
     event_types: Joi.array().items(Joi.string()).required(),
     categories: Joi.array().items(Joi.string()).required()
 });
+
+export const AgentDataSchema = Joi.object({
+    agentId: Joi.string().required(),
+    dateOption: Joi.string().required()
+})
