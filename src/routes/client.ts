@@ -47,4 +47,6 @@ router
 
     .post("/agent", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.fetch_agent_data(req, res, next))
 
+    .get("/schedule-details", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.schedule_details(req, res, next))
+
 export default router; 

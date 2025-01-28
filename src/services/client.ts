@@ -1461,6 +1461,62 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
+    async schedule_details(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const agentId = req.query.agentId;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const recent_schedule = await jobModel
+                .findOne({ agentId })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            if (!recent_schedule) return res.status(400).json({ message: "No schedule found"});
+
+            const { totalContactToProcess, scheduledTime, completedPercent } = recent_schedule;
+
+            const dateToCheck = scheduledTime.split("T")[0];
+
+            const stats = await DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId,
+                        day: dateToCheck
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCalls: { $sum: "$totalCalls" },
+                        totalAppointments: { $sum: "$totalAppointment" }
+                    }
+                }
+            ]);
+
+            const calls = stats[0]?.totalCalls || 0;
+            const bookings = stats[0]?.totalAppointments || 0;
+
+            const result = {
+                contacts: totalContactToProcess,
+                calls,
+                bookings,
+                scheduleProgress: Math.ceil(Number(completedPercent))
+            };
+ 
+            return res.status(200).json({
+                success: true,
+                ...result
+            });
+            
+        } catch (e) {
+            console.error("Error fetching schedule details: " + e);
+            next(e);
+        };
+    };
 };
 
 export const client_service = new ClientService();
