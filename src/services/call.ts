@@ -14,8 +14,56 @@ import { CancelScheduleSchema, ScheduleCallSchema } from "../validations/call";
 import moment from "moment-timezone";
 import { scheduleCronJob } from "../utils/scheduleJob";
 import schedule from "node-schedule";
+import { DateTime } from "luxon";
 
 class CallService extends RootService {
+
+    async fetch_minutes(agentId: string, next: NextFunction) {
+        try {
+            const now = DateTime.now().setZone("America/Los_Angeles");
+            const startOfMonth = now.startOf("month");
+            const todayDate = now.startOf("day");
+
+            const monthDates: string[] = [];
+            let currentDate = startOfMonth;
+
+            while (currentDate <= todayDate) {
+                monthDates.push(currentDate.toFormat("yyyy-MM-dd"));
+
+                currentDate = currentDate.plus({ days: 1 });
+            };
+
+            console.log("month dates: ", monthDates);
+            const duration = await DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId,
+                        day: {
+                            $in: monthDates
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total_duration: { $sum: "$totalCallDuration" }
+                    }
+                }
+            ]);
+            console.log("dura: ", duration);
+
+            const milliseconds = duration[0]?.total_duration || 0;
+
+            const minutes = Math.floor(milliseconds / 60000);
+            console.log("minutes: ", minutes);
+
+            return minutes;
+
+        } catch (e) {
+            console.error("Error fetching minutes: ", e);
+            next(e);
+        };
+    };
 
     async schedule_call(req: Request, res: Response, next: NextFunction): Promise<Response>{
         try {
@@ -39,6 +87,15 @@ class CallService extends RootService {
             const formattedDate = moment(scheduledTimePST).format("YYYY-MM-DDTHH:mm:ss");
 
             const lowerCaseTag = tag.toLowerCase();
+
+            const minutes = await this.fetch_minutes(agentId, next) as number;
+            
+            if (minutes >= 4500) {
+                // trigger notification
+            } else {
+                console.log("hello");
+            };
+            return;
 
             const call_schedule = await scheduleCronJob(
                 scheduledTimePST,

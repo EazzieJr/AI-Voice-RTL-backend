@@ -1465,7 +1465,7 @@ class ClientService extends RootService {
     async schedule_details(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
         try {
             const clientId = req.user._id;
-            const agentId = req.query.agentId;
+            const agentId = req.query.agentId as string;
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
@@ -1511,7 +1511,7 @@ class ClientService extends RootService {
                 success: true,
                 ...result
             });
-            
+
         } catch (e) {
             console.error("Error fetching schedule details: " + e);
             next(e);
