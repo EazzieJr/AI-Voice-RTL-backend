@@ -1,10 +1,6 @@
 import { model, Schema } from "mongoose";
 
 const replySchema = new Schema({
-    agentId: {
-        type: String,
-        required: [true, "Agent ID is required"]
-    },
     client: {
         type: Schema.Types.ObjectId,
         required: [true, "Client is required"],

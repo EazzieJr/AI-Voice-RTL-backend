@@ -49,4 +49,6 @@ router
 
     .get("/schedule-details", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.schedule_details(req, res, next))
 
+    .post("/email-reply/webhook", (req: AuthRequest, res: Response) => client_service.email_reply_webhook(req, res))
+
 export default router; 

@@ -17,6 +17,7 @@ import { DateTime } from "luxon";
 import { dailyGraphModel } from "../models/graphModel";
 import axios from "axios";
 import { WebhookModel } from "../models/webhook";
+import { ReplyModel } from "../models/emailReply";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -1517,6 +1518,73 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
+    async email_reply_webhook(request: AuthRequest, response: Response) {
+        try {
+            const body = request.body;
+
+            console.log("email reply webhook: ", body);
+
+            const clientId = body.clientId;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+
+            const foundClient = clients_data.find((client: ClientObject) => client.id === clientId);
+
+            if (!foundClient) {
+                console.error("Could not find client");
+            };
+
+            const client_name = foundClient.logo;
+
+            let client;
+
+            if (client_name === "Digital Mavericks Media") {
+                const client_details = await userModel.findOne({ name: client_name }).select("-password -passwordHash");
+
+                client = client_details._id;
+
+            } else if (client_name === "Cory Warfield") {
+                const client_details = await userModel.findOne({ name: "Cory Lopez-Warfield" }).select("-password -passwordHash");
+
+                client = client_details._id;
+
+            } else {
+                const client_details = await userModel.findOne({ name: client_name }).select("-password -passwordHash");
+
+                client = client_details._id;
+
+            };
+
+            const new_reply = await ReplyModel.create({
+                client,
+                ...body
+            });
+
+            if (!new_reply._id) {
+                console.error("Error creating new reply");
+            };
+
+        } catch (e) {
+            console.error("Error receiving email sent webhook: " + e);
+        };
+    };
+
 };
 
 export const client_service = new ClientService();
