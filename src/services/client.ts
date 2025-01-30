@@ -1585,6 +1585,33 @@ class ClientService extends RootService {
         };
     };
 
+    async fetch_replies(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const replies = await ReplyModel
+                .find({
+                    client: clientId,
+                    repliedTo: false
+                })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            if (replies.length < 1) return res.status(200).json({ message: "No replies yet" });
+
+            return res.status(200).json({
+                success: true,
+                replies
+            });
+
+        } catch (e) {
+            console.error("Error fetching replies: " + e);
+            next(e);
+        };
+    };
+
 };
 
 export const client_service = new ClientService();

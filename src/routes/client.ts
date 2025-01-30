@@ -51,4 +51,6 @@ router
 
     .post("/email-reply/webhook", (req: AuthRequest, res: Response) => client_service.email_reply_webhook(req, res))
 
+    .get("/lead-replies", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.fetch_replies(req, res, next))
+
 export default router; 
