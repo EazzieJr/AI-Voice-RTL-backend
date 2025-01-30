@@ -1978,6 +1978,30 @@ export class Server {
           { expiresIn: "1d" },
         );
 
+        // make trigger
+        const user = {
+          token,
+          username: userInDb.username,
+          userId: userInDb._id,
+          group: userInDb.group,
+          name: userInDb.name,
+          agentIds: result,
+          isUserAdmin: userInDb.isAdmin,
+        };
+
+        try {
+          const hello = await axios.post('https://hook.us1.make.com/upftnnyhgxdefrdmntjpawa9gcrmdbz7', { user });
+
+          console.log("make data: ", hello.data);
+
+        } catch (e) {
+          console.error("Error triggering make url");
+          return res.status(200).json({
+            message: "Login successfult but make trigger failed",
+            user
+          });
+        };
+
         res.json({
           payload: {
             message: "Logged in successfully",
