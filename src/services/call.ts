@@ -15,6 +15,7 @@ import moment from "moment-timezone";
 import { scheduleCronJob } from "../utils/scheduleJob";
 import schedule from "node-schedule";
 import { DateTime } from "luxon";
+import { userModel } from "../models/userModel";
 
 class CallService extends RootService {
 
@@ -86,16 +87,20 @@ class CallService extends RootService {
 
             const formattedDate = moment(scheduledTimePST).format("YYYY-MM-DDTHH:mm:ss");
 
+            const currentDate = DateTime.now().setZone("America/Los_Angeles").toISO();
+
+            if (formattedDate <= currentDate) return res.status(400).json({ message: "Date and time has to be in the future" });
+
             const lowerCaseTag = tag.toLowerCase();
 
             const minutes = await this.fetch_minutes(agentId, next) as number;
             
-            if (minutes >= 4500) {
+            if (minutes >= 5000) {
+                return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
+            } else if (minutes >= 4500) {
                 // trigger notification
-            } else {
-                console.log("hello");
+                console.log("Minutes quota has exceeded 4500 minutes");
             };
-            return;
 
             const call_schedule = await scheduleCronJob(
                 scheduledTimePST,
@@ -108,11 +113,10 @@ class CallService extends RootService {
                 next
             );
 
-            console.log("call sched: ", call_schedule);
-
             return res.status(200).json({
                 call_schedule
             });
+
         } catch (e) {
             console.error("Error scheduling call: " + e);
             next(e);
