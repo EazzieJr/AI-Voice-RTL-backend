@@ -1521,7 +1521,7 @@ class ClientService extends RootService {
 
     async email_reply_webhook(request: AuthRequest, response: Response) {
         try {
-            const body = request.body;
+            const body = request.body[0];
 
             console.log("email reply webhook: ", body);
 
