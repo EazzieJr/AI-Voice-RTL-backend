@@ -53,4 +53,6 @@ router
 
     .get("/lead-replies", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.fetch_replies(req, res, next))
 
+    .post("/agent-update", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.update_agent(req, res, next))
+
 export default router; 

@@ -4,8 +4,8 @@ import { AuthRequest } from "../middleware/authRequest";
 import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
-import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema } from "../validations/client";
+import { contactModel, EventModel, jobModel } from "../models/contact_model";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -1612,6 +1612,133 @@ class ClientService extends RootService {
         };
     };
 
+    async update_agent(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = UpdateAgentIdSchema.validate(body, { abortEarly: false});
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "Client not found"});
+
+            const { agentId, newAgentId } = body;
+
+            const check_agent = await userModel.findOne({ "agents.agentId": agentId });
+
+            if (!check_agent) return res.status(400).json({ message: "AgentId to replace not found" });
+
+            let successUpdates = [];
+            let failedUpdates = [];
+
+            const user = await userModel.updateOne(
+                { "agents.agentId": agentId },
+                { $set: {
+                        'agents.$.agentId': newAgentId
+                    }
+                }
+            );
+            if (user.acknowledged) {
+                successUpdates.push("user");
+            } else {
+                failedUpdates.push("user");
+            };
+
+            const retell = await contactModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (retell.acknowledged) {
+                successUpdates.push("contacts");
+            } else {
+                failedUpdates.push("contacts");
+            };
+
+            const transcript = await EventModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (transcript.acknowledged) {
+                successUpdates.push("transcripts");
+            } else {
+                failedUpdates.push("transcripts")
+            };
+
+            const job = await jobModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (job.acknowledged) {
+                successUpdates.push("job");
+            } else {
+                failedUpdates.push("job");
+            };
+
+            const graph = await dailyGraphModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (graph.acknowledged) {
+                successUpdates.push("graph");
+            } else {
+                failedUpdates.push("graph");
+            };
+
+            const daily = await DailyStatsModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (daily.acknowledged) {
+                successUpdates.push("daily");
+            } else {
+                failedUpdates.push("daily");
+            };
+
+            const history = await callHistoryModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (history.acknowledged) {
+                successUpdates.push("history");
+            } else {
+                failedUpdates.push("history");
+            };
+
+            return res.status(200).json({
+                successUpdates,
+                failedUpdates
+            });
+
+        } catch (e) {
+            console.error("Error updating agent" + e);
+            next(e);
+        };
+    };
 };
 
 export const client_service = new ClientService();
