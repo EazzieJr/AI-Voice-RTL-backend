@@ -1,95 +1,111 @@
+import { number } from "joi";
 import { model, Schema } from "mongoose";
+import { StringDecoder } from "string_decoder";
 
 const replySchema = new Schema({
-    client: {
-        type: Schema.Types.ObjectId,
-        required: [true, "Client is required"],
-        ref: "User"
-    },
-    campaignName: {
+    _id: {
         type: String
     },
-    campaignId: {
+    campaign_name: {
+        type: String
+    },
+    campaign_id: {
         type: Number
     },
-    clientId: {
+    client_id: {
         type: Number
     },
-    webhookId: {
+    webhook_id: {
         type: Number
     },
-    webhookName: {
+    webhook_name: {
         type: String
     },
-    campaignStatus: {
+    campaign_status: {
         type: String
     },
-    statsId: {
+    message_id: {
         type: String
     },
-    fromEmail: {
+    stats_id: {
+        type: String
+    },
+    from_email: {
         type: String,
         required: [true, "From email is required"]
+    },
+    preview_text: {
+        type: String
     },
     subject: {
         type: String
     },
-    sentMessage: {
-        messageId: String,
+    time_replied: {
+        type: String
+    },
+    sent_message: {
+        message_id: String,
         html: String,
         text: String,
         time: String
     },
-    toEmail: {
+    to_email: {
         type: String,
         required: [true, "To email is required"]
     },
-    toName: {
+    to_name: {
         type: String
     },
-    eventTimestamp: {
+    event_timestamp: {
         type: String
     },
-    replyMessage: {
-        messageId: String,
+    promptType: {
+        type: String
+    },
+    reply_body: {
+        type: String
+    },
+    reply_category: {
+        type: Number,
+    },
+    reply_message: {
+        message_id: String,
         html: String,
         text: String,
         time: String
     },
-    sequenceNumber: {
-        type: Number
-    },
-    secretKey: {
+    sent_message_body: {
         type: String
     },
-    appUrl: {
+    sequence_number: {
+        type: Number
+    },
+    secret_key: {
+        type: String
+    },
+    app_url: {
         type: String
     },
     description: {
         type: String
     },
+    ui_master_inbox_link: {
+        type: String
+    },
     metadata: {
-        webhookCreatedAt: String
+        webhook_created_at: Date
     },
-    webhookUrl: {
+    event_type: {
         type: String
     },
-    eventType: {
-        type: String
-    },
-    slEmailLeadId: {
+    sl_email_lead_id: {
         type: Number
     },
-    slEmailLeadMapId: {
+    sl_email_lead_map_id: {
         type: Number
     },
-    slLeadEmail: {
+    sl_lead_email: {
         type: String
-    },
-    repliedTo: {
-        type: Boolean,
-        required: true,
-        default: false
     }
 }, { timestamps: true });
 
