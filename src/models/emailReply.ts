@@ -106,6 +106,9 @@ const replySchema = new Schema({
     },
     sl_lead_email: {
         type: String
+    },
+    replied_to: {
+        type: Boolean
     }
 }, { timestamps: true });
 
