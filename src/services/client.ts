@@ -1591,10 +1591,43 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+
+            const { id } = foundClient;
+
             const replies = await ReplyModel
                 .find({
-                    client: clientId,
-                    repliedTo: false
+                    client_id: id,
+                    replied_to: false
                 })
                 .sort({ createdAt: -1 })
                 .lean();
