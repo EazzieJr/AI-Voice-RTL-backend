@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=production nodemon src/index.ts",
+    "build": "npm install && tsc",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "start-dev": "cross-env NODE_ENV=development node dist/index.js",
-    "build": "npm install && tsc",
     "pm2-start": "NODE_ENV=production pm2 start dist/index.js -i max --name retel-server --watch --ignore-watch=node_modules",
     "pm2-stop": "pm2 stop retel-server",
     "pm2-monitor": "pm2 monit",
@@ -19,7 +19,6 @@
     "@azure/openai": "^1.0.0-beta.11",
     "@google-cloud/local-auth": "^2.1.0",
     "@jridgewell/sourcemap-codec": "^1.5.0",
-    "@types/node": "^22.5.4",
     "argon2": "^0.40.3",
     "axios": "^1.6.7",
     "compression": "^1.7.4",
@@ -28,7 +27,7 @@
     "cron": "^3.1.6",
     "cron-parser": "^4.9.0",
     "cross-env": "^7.0.3",
-    "csv-parser": "^3.0.0",
+    "csv-parser": "^3.1.0",
     "csv-stringify": "^6.5.1",
     "csv-writer": "^1.6.0",
     "date-fns": "^3.6.0",
@@ -59,6 +58,7 @@
     "retell-sdk": "^4.6.0",
     "smee-client": "^2.0.1",
     "twilio": "^4.21.0",
+    "typescript": "^5.7.3",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
@@ -72,6 +72,7 @@
     "@types/hpp": "^0.2.6",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/multer": "^1.4.11",
+    "@types/node": "^22.10.7",
     "@types/node-cron": "^3.0.11",
     "@types/node-schedule": "^2.1.6",
     "@types/papaparse": "^5.3.14",
@@ -80,7 +81,6 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.3",
     "wrangler": "^3.51.0"
   }
 }

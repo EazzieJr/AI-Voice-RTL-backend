@@ -47,8 +47,8 @@ export const scheduleCronJob = async (
     // const CUTOFF_HOUR = 14;
     // const CUTOFF_MINUTE = 10;
 
-    const CUTOFF_HOUR = 15;
-    const CUTOFF_MINUTE = 30;
+    const CUTOFF_HOUR = 16;
+    const CUTOFF_MINUTE = 10;
 
     await jobModel.create({
       callstatus: jobstatus.QUEUED,
@@ -138,8 +138,13 @@ export const scheduleCronJob = async (
               { jobId },
               { callstatus: "cancelled", shouldContinueProcessing: false },
             );
+
+            console.log("contacts: ", contacts);
+
             if (contacts.length > 0) {
               const contactIds = contacts.map(contact => contact._id);
+              console.log("In here")
+              console.log("cont ids: ", contactIds);
               await contactModel.updateMany(
                 { _id: { $in: contactIds } },
                 { $set: { isTaken: false } }

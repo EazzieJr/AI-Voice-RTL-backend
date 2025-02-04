@@ -1,7 +1,7 @@
-import { contactModel, EventModel } from "../models/contact_model";
+import { contactModel, EventModel, jobModel } from "../models/contact_model";
 import RootService from "./_root";
 import { Request, Response, NextFunction } from "express";
-import { callSentimentenum, callstatusenum } from "../utils/types";
+import { callSentimentenum, callstatusenum, jobstatus } from "../utils/types";
 import { reviewCallback, reviewTranscript } from "../utils/transcript-review";
 import callHistoryModel from "../models/historyModel";
 import { DailyStatsModel } from "../models/logModel";
@@ -9,8 +9,120 @@ import { updateStatsByHour } from "../controllers/graphController";
 import { time } from "console";
 import { nextDay } from "date-fns";
 import axios from "axios";
+import { AuthRequest } from "../middleware/authRequest";
+import { CancelScheduleSchema, ScheduleCallSchema } from "../validations/call";
+import moment from "moment-timezone";
+import { scheduleCronJob } from "../utils/scheduleJob";
+import schedule from "node-schedule";
+import { DateTime } from "luxon";
+import { userModel } from "../models/userModel";
 
 class CallService extends RootService {
+
+    async fetch_minutes(agentId: string, next: NextFunction) {
+        try {
+            const now = DateTime.now().setZone("America/Los_Angeles");
+            const startOfMonth = now.startOf("month");
+            const todayDate = now.startOf("day");
+
+            const monthDates: string[] = [];
+            let currentDate = startOfMonth;
+
+            while (currentDate <= todayDate) {
+                monthDates.push(currentDate.toFormat("yyyy-MM-dd"));
+
+                currentDate = currentDate.plus({ days: 1 });
+            };
+
+            console.log("month dates: ", monthDates);
+            const duration = await DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId,
+                        day: {
+                            $in: monthDates
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total_duration: { $sum: "$totalCallDuration" }
+                    }
+                }
+            ]);
+            console.log("dura: ", duration);
+
+            const milliseconds = duration[0]?.total_duration || 0;
+
+            const minutes = Math.floor(milliseconds / 60000);
+            console.log("minutes: ", minutes);
+
+            return minutes;
+
+        } catch (e) {
+            console.error("Error fetching minutes: ", e);
+            next(e);
+        };
+    };
+
+    async schedule_call(req: Request, res: Response, next: NextFunction): Promise<Response>{
+        try {
+            const body = req.body;
+
+            const { error } = ScheduleCallSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const { hour, minute, agentId, limit, fromNumber, tag } = req.body
+
+            const scheduledTimePST = moment
+                .tz("America/Los_Angeles")
+                .set({
+                    hour,
+                    minute,
+                    second: 0,
+                    millisecond: 0
+                })
+                .toDate();
+
+            const formattedDate = moment(scheduledTimePST).format("YYYY-MM-DDTHH:mm:ss");
+
+            const currentDate = DateTime.now().setZone("America/Los_Angeles").toISO();
+
+            if (formattedDate <= currentDate) return res.status(400).json({ message: "Date and time has to be in the future" });
+
+            const lowerCaseTag = tag.toLowerCase();
+
+            const minutes = await this.fetch_minutes(agentId, next) as number;
+            
+            if (minutes >= 5000) {
+                return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
+            } else if (minutes >= 4500) {
+                // trigger notification
+                console.log("Minutes quota has exceeded 4500 minutes");
+            };
+
+            const call_schedule = await scheduleCronJob(
+                scheduledTimePST,
+                agentId,
+                limit,
+                fromNumber,
+                formattedDate,
+                lowerCaseTag,
+                res,
+                next
+            );
+
+            return res.status(200).json({
+                call_schedule
+            });
+
+        } catch (e) {
+            console.error("Error scheduling call: " + e);
+            next(e);
+        };
+    };
+
     async retell_webhook(req: Request, res: Response, next: NextFunction): Promise<Response>{
         try {
             const payload = req.body;
@@ -72,6 +184,25 @@ class CallService extends RootService {
                     { callId: call_id, agentId: agent_id },
                     { dial_status: callstatusenum.IN_PROGRESS }
                 );
+
+                const new_event = await EventModel.create({
+                    callId: call_id,
+                    agentId: agent_id
+                });
+
+                if (!new_event._id) {
+                    console.log("Error creating new event model");
+                };
+
+                const hist_data = await callHistoryModel.create({
+                    callId: call_id,
+                    agentId: agent_id
+                });
+
+                if (!hist_data._id) {
+                    console.log("Error creating new event model");
+                };
+
             } else {
                 console.error("Event must be call_started: ", event);
             }            
@@ -117,19 +248,6 @@ class CallService extends RootService {
             };
 
             if (event === "call_ended") {
-                // let agentNameEnum;
-
-                // if (agent_id === "agent_1852d8aa89c3999f70ecba92b8") {
-                //     agentNameEnum = "ARS";
-                // } else if (agent_id === "agent_6beffabb9adf0ef5bbab8e0bb2") {
-                //     agentNameEnum = "LQR";
-                // } else if (agent_id === "agent_155d747175559aa33eee83a976") {
-                //     agentNameEnum = "SDR";
-                // } else if (agent_id === "214e92da684138edf44368d371da764c") {
-                //     agentNameEnum = "TVAG";
-                // } else {
-                //     console.error("Unrecognized agent: ", agent_id);
-                // };
 
                 const call_failed = disconnection_reason === "dial_failed";
                 const call_transferred = disconnection_reason === "call_transfer";
@@ -194,6 +312,8 @@ class CallService extends RootService {
                     callStatus = callstatusenum.CALLED;
                 };
 
+                // console.log("dial: ", callStatus);
+
                 const callData = {
                     callId: call_id,
                     agentId: agent_id,
@@ -222,15 +342,22 @@ class CallService extends RootService {
                     dial_status: callStatus,
                 };
 
+                // console.log("callData: ", callData);
+
                 const history_update = await callHistoryModel.findOneAndUpdate(
                     { callId: call_id, agentId: agent_id },
                     { $set: callData },
                     { returnOriginal: false }
                 );
 
+                // console.log("resu: ", history_update);
+
                 const jobId_from_retell = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id : null;
 
                 let statResults;
+
+                console.log("today: ", todayString);
+                console.log("jobId: ", jobId_from_retell);
 
                 statResults = await DailyStatsModel.findOneAndUpdate(
                     { day: todayString, agentId: agent_id, jobProcessedBy: jobId_from_retell },
@@ -238,10 +365,14 @@ class CallService extends RootService {
                     { returnOriginal: false }
                 );
 
+                console.log("update: ", statResults);
+
                 const timestamp = new Date();
 
                 await updateStatsByHour(agent_id, todayString, timestamp);
 
+
+                // console.log("ended event: ", ended_data_update);
                 const updateData: any = {
                     dial_status: callStatus,
                     $push: {
@@ -257,6 +388,13 @@ class CallService extends RootService {
                 } else {
                     console.log("stat: ", statResults);
                 };
+
+                const update_contact = await contactModel.findOneAndUpdate(
+                    { callId: call_id, agentId: agent_id },
+                    { $set: updateData }
+                );
+
+                // console.log("updat: ", update_contact);
                 
             } else {
                 console.error("Event must be call_ended: ", event);
@@ -356,6 +494,73 @@ class CallService extends RootService {
 
         } catch (e) {
             console.error("Error fetching data after call analyzed: ", + e);
+            next(e);
+        };
+    };
+
+    async cancel_schedule(req: AuthRequest, res: Response, next: NextFunction): Promise<Response>{
+        try {
+            const body = req.body;
+
+            const { error } = CancelScheduleSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const { jobId } = body;
+
+            const job = await jobModel.findOne({ jobId });
+            if (!job) return res.status(400).json({ message: `Job with JobId: ${jobId} not found`});
+
+            const { agentId, tagProcessedFor } = job;
+
+            const update_contacts = await contactModel.updateMany(
+                { 
+                    agentId, 
+                    tag: tagProcessedFor, 
+                    isTaken: true,
+                    isDeleted: false
+                },
+                { isTaken: false }
+            );
+
+            console.log("cont_update: ", update_contacts);
+
+            if (!update_contacts.acknowledged) return res.status(400).json({ message: "Failed to update contacts isTaken to false"});
+
+
+            const scheduledJobs = schedule.scheduledJobs;
+
+            console.log("scheudles: ", scheduledJobs);
+            if (!scheduledJobs.hasOwnProperty(jobId)) {
+                return res.status(404).json({ message: `Job with ${jobId} not found or has been executed`});
+            };
+
+            const isCancelled = schedule.cancelJob(jobId);
+            if (isCancelled) {
+                const update_job = await jobModel.findOneAndUpdate(
+                    { 
+                        jobId,
+                        callstatus: {
+                            $ne: "cancelled"
+                        }
+                    },
+                    {
+                        callstatus: jobstatus.CANCELLED,
+                        shouldContinueProcessing: false
+                    },
+                    { new: true }
+                );
+
+                console.log("update: ", update_job);
+                if (!update_job) return res.status(400).json({ message: "Error setting call status to cancelled"});
+
+                res.status(200).json({ schedule_cancelled: update_job });
+
+            } else {
+                res.status(500).json({ message: `Unable to cancel job with JobId: ${jobId}` });
+            };
+
+        } catch(e) {
+            console.error("Error cancelling schedule" + e);
             next(e);
         };
     };

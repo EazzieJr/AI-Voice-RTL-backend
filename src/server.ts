@@ -575,7 +575,15 @@ export class Server {
           answeredByVM: false,
           isusercalled: false,
           timesCalled: "",
-          isTaken: false,
+          // callId: "",
+          isTaken:false,
+          referenceToCallId: null,
+          linktocallLogModel: null,
+          datesCalled: [],
+          dayToBeProcessed: "",
+          jobProcessedWithId: [],
+          isOnDNCList: false,
+          calledTimes: 0
         });
         res.json({ result });
       },
@@ -1434,12 +1442,14 @@ export class Server {
         limit = 100,
       } = req.body;
 
+      console.log("req.body is: ", req.body);
+
       if (!agentIds) {
         return res
           .status(400)
           .json({ error: "Agent IDs is required for the search." });
       }
-
+      
       try {
         const isValidEmail = (email: string): boolean => {
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1532,7 +1542,8 @@ export class Server {
         const today = format(zonedNow, "yyyy-MM-dd", { timeZone });
         let dateFilter = {};
         let dateFilter1 = {};
-        console.log(dateOption);
+        console.log("hello  there");
+        console.log("this is ", dateOption);
         if (dateOption) {
           switch (dateOption) {
             case DateOption.Today:
@@ -1570,12 +1581,19 @@ export class Server {
           }
         } else if (startDate || endDate) {
           query["datesCalled"] = {};
-          if (startDate && !endDate) {
-            query["datesCalled"]["$eq"] = formatDateToDB(startDate);
-          } else if (startDate && endDate) {
+
+          if (startDate && endDate) {
             query["datesCalled"]["$gte"] = formatDateToDB(startDate);
             query["datesCalled"]["$lte"] = formatDateToDB(endDate);
-          }
+          } else if (startDate) {
+            query["datesCalled"]["eq"] = formatDateToDB(startDate);
+          };
+          // if (startDate && !endDate) {
+          //   query["datesCalled"]["$eq"] = formatDateToDB(startDate);
+          // } else if (startDate && endDate) {
+          //   query["datesCalled"]["$gte"] = formatDateToDB(startDate);
+          //   query["datesCalled"]["$lte"] = formatDateToDB(endDate);
+          // }
         }
 
         //   if(dateOption){
@@ -1611,7 +1629,7 @@ export class Server {
           totalRecords = await contactModel.countDocuments(query);
           totalPages = Math.ceil(totalRecords / limit);
 
-          console.log(query);
+          console.log("this is query", query);
           results = await contactModel
             .find(query)
             .populate("referenceToCallId")
@@ -1620,8 +1638,8 @@ export class Server {
         }
 
         const data = results.map((history) => ({
-          firstname: history.firstname || "",
-          lastname: history.lastname || "",
+          firstName: history.firstname || "",
+          lastName: history.lastname || "",
           email: history.email || "",
           phone: history.phone || "",
           dial_status: history.dial_status || "",
@@ -1961,6 +1979,30 @@ export class Server {
           process.env.JWT_SECRET,
           { expiresIn: "1d" },
         );
+
+        // make trigger
+        const user = {
+          token,
+          username: userInDb.username,
+          userId: userInDb._id,
+          group: userInDb.group,
+          name: userInDb.name,
+          agentIds: result,
+          isUserAdmin: userInDb.isAdmin,
+        };
+
+        try {
+          const hello = await axios.post('https://hook.us1.make.com/upftnnyhgxdefrdmntjpawa9gcrmdbz7', { user });
+
+          console.log("make data: ", hello.data);
+
+        } catch (e) {
+          console.error("Error triggering make url");
+          return res.status(200).json({
+            message: "Login successfult but make trigger failed",
+            user
+          });
+        };
 
         res.json({
           payload: {
@@ -3841,6 +3883,8 @@ export class Server {
             stats = await dailyGraphModel.find({
               agentId: { $in: agentIds },
             });
+
+            console.log("stats: ", stats);
 
             const monthlyData = Array(12)
               .fill(0)

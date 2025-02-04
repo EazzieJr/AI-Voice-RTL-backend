@@ -21,24 +21,24 @@ export interface IContact {
   lastname: string;
   email: string;
   phone: string;
-  isusercalled: boolean;
-  isDeleted: boolean;
-  callId: String;
-  dial_status: string;
-  agentId: string;
-  referenceToCallId: any;
-  linktocallLogModel: any;
-  datesCalled: string[];
-  answeredByVM: boolean;
-  dayToBeProcessed: string
-  tag: string
-  jobProcessedWithId: string[]
-  callBackDate:string
-  isOnDNCList: boolean
-  timesCalled: string
+  isusercalled?: boolean;
+  isDeleted?: boolean;
+  callId?: String;
+  dial_status?: string;
+  agentId?: string;
+  referenceToCallId?: any;
+  linktocallLogModel?: any;
+  datesCalled?: string[];
+  answeredByVM?: boolean;
+  dayToBeProcessed?: string
+  tag?: string
+  jobProcessedWithId?: string[]
+  callBackDate?:string
+  isOnDNCList?: boolean
+  timesCalled?: string
   address:string
-  calledTimes: number
-  isTaken: boolean
+  calledTimes?: number
+  isTaken?: boolean
 }
 
 export enum DaysToBeProcessedEnum{

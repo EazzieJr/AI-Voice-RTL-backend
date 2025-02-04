@@ -4,11 +4,20 @@ import { AuthRequest } from "../middleware/authRequest";
 import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
-import { contactModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema } from "../validations/client";
+import { contactModel, EventModel, jobModel } from "../models/contact_model";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
+import fs, { stat } from "fs";
+import { IContact } from "../utils/types";
+import csvParser from "csv-parser";
+import { formatPhoneNumber } from "../utils/formatter";
+import { DateTime } from "luxon";
+import { dailyGraphModel } from "../models/graphModel";
+import axios from "axios";
+import { WebhookModel } from "../models/webhook";
+import { ReplyModel } from "../models/emailReply";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -286,6 +295,1481 @@ class ClientService extends RootService {
         } catch (error) {
             console.error("Error fetching call history: ", error);
             next(error);
+        };
+    };
+
+    async upload_csv(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            if (!req.file) return res.status(500).json({ message: "No file found" });
+            const body = req.body;
+
+            const { error } = UploadCSVSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+            
+            const csvFile = req.file;
+            const { agentId, tag } = body;
+            const lowerCaseTag = typeof tag === "string" ? tag.toLowerCase() : "";
+        
+            const requiredHeaders = ["firstname", "lastname", "phone", "email"];
+            const uniqueRecordsMap = new Map<string, IContact>();
+            const failedContacts: any[] = [];
+            const duplicateKeys = new Set<string>();
+
+            fs.createReadStream(csvFile.path)
+                .pipe(csvParser())
+                .on("headers", (headers) => {
+                    const missing_headers = requiredHeaders.filter((header)  => !headers.includes(header.trim().toLowerCase()));
+
+                    if (missing_headers.length > 0) return res.status(100).json({
+                        message: "CSV must contain the followin headers; firstname, lastname, phone, and email"
+                    })
+                })
+                .on("data", (row) => {
+                    const { firstname, lastname, email, phone, address } = row;
+
+                    if (firstname && phone) {
+                        const formattedPhone = formatPhoneNumber(phone);
+
+                        if (uniqueRecordsMap.has(formattedPhone)) {
+                            duplicateKeys.add(formattedPhone);
+                            failedContacts.push({ row, reason: "duplicate" });
+                        } else {
+                            uniqueRecordsMap.set(formattedPhone, {
+                                firstname,
+                                lastname,
+                                phone: formattedPhone,
+                                email,
+                                address: address || ""
+                            });
+                        };
+                    } else {
+                        failedContacts.push({ row, reason: "missing required fields" });
+                    };
+                })
+                .on("end", async() => {
+                    const uniqueUsersToInsert = Array.from(uniqueRecordsMap.values()).filter(
+                        (user) => !duplicateKeys.has(user.phone)
+                    );
+
+                    const dncList: string[] = [""];
+                    const usersWithAgentId = uniqueUsersToInsert.map((user) => ({
+                        ...user,
+                        agentId: agentId,
+                        tag: lowerCaseTag,
+                        isOnDNCList: dncList.includes(user.phone),
+                    }));
+
+                    const phoneNumbersToCheck = usersWithAgentId.map((user) => user.phone);
+                    const existingUsers = await contactModel.find({
+                        isDeleted: false,
+                        phone: { $in: phoneNumbersToCheck },
+                    });
+
+                    const dbDuplicates = existingUsers;
+                    const existingPhoneNumbers = new Set(
+                        existingUsers.map((user) => user.phone)
+                    );
+
+                    const finalUsersToInsert = usersWithAgentId.filter(
+                        (user) => !existingPhoneNumbers.has(user.phone) && user.phone
+                    );
+        
+                    if (finalUsersToInsert.length > 0) {
+                        console.log("Inserting users:", finalUsersToInsert);
+                        await contactModel.bulkWrite(
+                            finalUsersToInsert.map((user) => ({
+                            insertOne: { document: user },
+                            }))
+                        );
+                        await userModel.updateOne(
+                            { "agents.agentId": agentId },
+                            { $addToSet: { "agents.$.tag": lowerCaseTag } }
+                        );
+                    };
+
+                    fs.unlink(csvFile.path, (err) => {
+                        if (err) {
+                            console.error("Unable to delete file: ", err);
+                        } else {
+                            console.log("Deleted file successfully");
+                        };
+                    });
+
+                    res.status(200).json({
+                        message: `Upload successful, contacts uploaded: ${finalUsersToInsert.length}`,
+                        duplicates: dbDuplicates,
+                        failedContacts
+                    });
+                })
+                .on("error", (err) => {
+                    console.error("Error processing CSV: ", err);
+                    res.status(500).json({ message: "Failed to process CSV data" });
+                });
+                
+        } catch (e) {
+            console.error("Error uploading csv file: ", e);
+            next(e);
+        };
+    };
+
+    async graph_chart(req: AuthRequest, res: Response, next: NextFunction): Promise<Response>{
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = DashboardSchema.validate(body, {
+                abortEarly: false
+            });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const dateOption = req.body.dateOption as DateOption;
+            const { agentIds } = body;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            if (!Object.values(DateOption).includes(dateOption)) {
+                return res.status(400).json({ error: "Invalid date option" })
+            };
+
+            const selectedDateOption = dateOption;
+            const timeZone = "America/Los_Angeles";
+
+            const createHourlyTemplate = () => 
+                Array.from({ length: 7 }, (_, i) => ({
+                    x: `${(9 + i).toString().padStart(2, "0")}:00`,
+                    y: 0
+                }));
+            
+            const sumHourlyCalls = (hourlyCalls: Map<string, number>, start = 9, end = 15) => 
+                Array.from(hourlyCalls.entries())
+                    .filter(([hour]) => {
+                    const hourInt = parseInt(hour.split(":")[0], 10);
+                    return hourInt >= start && hourInt < end;
+                    })
+                    .reduce((sum, [, count]) => sum + count, 0);
+        
+            const getWeekDays = (startDay: DateTime) => 
+                Array.from({ length: 7 }, (_, i) => startDay.minus({ days: i }).toISODate()).reverse();
+            
+            // Fetching data based on DateOption;
+            let response: any[];
+
+            if (selectedDateOption === DateOption.Today) {
+                console.log("hello: I am here");
+                const today = DateTime.now().setZone(timeZone).startOf("day").toISODate();
+
+                const stats = await dailyGraphModel.find({
+                    agentId: { $in: agentIds },
+                    date: today
+                });
+
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and day" });
+                };
+
+                const aggregatedCalls = stats.reduce((acc, stat) => {
+                    const hourlyCalls = stat.hourlyCalls as Map<string, number>;
+                    hourlyCalls.forEach((count, hour) => {
+                        if (!acc[hour]) acc[hour] = 0;
+                        acc[hour] += count;
+                    });
+                    return acc;
+                }, {} as { [hour: string]: number });
+
+                response = createHourlyTemplate().map((entry) => ({
+                    ...entry,
+                    y: aggregatedCalls[entry.x] || 0
+                }));
+            } else if (selectedDateOption === DateOption.ThisWeek) {
+                const startDay = DateTime.now().setZone(timeZone).startOf("day");
+                const weekDays: string[] = getWeekDays(startDay);
+
+                const stats = await dailyGraphModel.find({
+                    agentId: { $in: agentIds },
+                    date: { $in: weekDays }
+                });
+
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                };
+
+                response = weekDays.map((day) => {
+                    const dayStats = stats.filter((stat) => stat.date === day);
+                    const dailySum = dayStats.reduce((sum, stat) => sum + sumHourlyCalls(stat.hourlyCalls), 0);
+
+                    const dayName = DateTime.fromISO(day, { zone: timeZone }).toLocaleString({ weekday: "long" });
+
+                    return { x: dayName, y: dailySum || 0 };
+                });
+            } else if (selectedDateOption === DateOption.ThisMonth) {
+                const stats = await dailyGraphModel.find({ agentId: { $in: agentIds } });
+                console.log("month: ", stats);
+
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                };
+
+                response = Array.from({ length: 12 }, (_, i) => {
+                    const monthStats = stats.filter(
+                        (stat) => DateTime.fromISO(stat.date).month === i + 1
+                    );
+                    const monthlySum = monthStats.reduce((sum, stat) => sum + sumHourlyCalls(stat.hourlyCalls), 0);
+
+                    const monthName = DateTime.fromObject({ month: i + 1 }).toLocaleString({ month: "long" });
+                    
+                    return { x: monthName, y: monthlySum };
+                });
+            } else if (selectedDateOption === DateOption.LAST_SCHEDULE) {
+                const lastStat = await dailyGraphModel
+                    .findOne({ agentId: { $in: agentIds } })
+                    .sort({ date: -1 });
+
+                if (!lastStat) {
+                    response = createHourlyTemplate();
+                } else  {
+                    const stats = await dailyGraphModel.find({
+                        agentId: { $in: agentIds },
+                        date: lastStat.date,
+                    });
+
+                    if (stats.length === 0) {
+                        return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                    };
+
+                    const aggregatedCalls = stats.reduce((acc, stat) => {
+                        const hourlyCalls = stat.hourlyCalls as Map<string, number>;
+                        hourlyCalls.forEach((count, hour) => {
+                            if (!acc[hour]) acc[hour] = 0;
+                            acc[hour] += count;
+                        });
+                        return acc;
+                    }, {} as { [hour: string]: number });
+
+                    response = createHourlyTemplate().map((entry) => ({
+                        ...entry,
+                        y: aggregatedCalls[entry.x] || 0,
+                    }));
+                };
+            } else {
+                return res.status(400).json({ error: "Invalid dateOption" });
+            };
+
+            return res.status(200).json({
+                success: true,
+                response
+            });
+
+        } catch (e) {
+            console.error("Error fetching client graph" + e);
+            next(e);
+        };
+    };
+
+    async all_campaigns(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaigns = await axios.get(url);
+            const result = campaigns.data;
+
+            if (!result) return res.status(400).json({ message: "all stats not found"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+    
+        } catch (e) {
+            console.error('Error fetching all campaigns from smart lead: ' + e);
+            next(e);
+        };
+    };
+
+    async single_campaign(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const result = campaign.data;
+
+            if (!result) return res.status(400).json({ message: "stats not found"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching single campaign from smart-lead: " + e);
+            next(e);
+        };
+    };
+
+    async single_campaign_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = CampaignStatisticsSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const { campaignId, limit, email_status, startDate, endDate } = body;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+            
+            const baseUrl = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/statistics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const queryParams = [];
+
+            if (limit) queryParams.push(`limit=${limit}`);
+            if (email_status) queryParams.push(`email_status=${email_status}`);
+            if (startDate) queryParams.push(`sent_time_start_date=${startDate}`);
+            if (endDate) queryParams.push(`sent_time_end_date=${endDate}`);
+
+            const url = queryParams.length ? `${baseUrl}&${queryParams.join('&')}` : baseUrl;
+
+            const campaign = await axios.get(url);
+
+            const result = campaign.data;
+
+            if (!result) return res.status(400).json({ message: "history not found"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching single campaign stats from smart lead: " + e);
+            next(e);
+        };
+    };
+
+    async single_campaign_analytics(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const result = campaign.data;
+
+            if (!result) return res.status(400).json({ message: "history not found"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching sinle campaign analytics: " + e);
+            next(e);
+        };
+    };
+
+    async all_campaign_analytics(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const page = req.query.page as string;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+
+            const { id } = foundClient;
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const all_campaigns = campaign.data;
+
+            if (!all_campaigns) return res.status(400).json({ message: "No Analytics not found"});
+
+            const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id);
+
+            const limit = 15;
+            const page_to_use = parseInt(page) || 1;
+            const startIndex = (page_to_use - 1) * limit;
+            const endIndex = page_to_use * limit;
+            const totalPages = Math.ceil(client_campaigns.length / limit);
+
+
+            if (page_to_use > totalPages) {
+                return res.status(400).json({
+                    error: "Page exceeds available data"
+                });
+            };
+
+            const campaignsToFetch = client_campaigns.slice(startIndex, endIndex);
+
+            let result: Object[] = [];
+
+            for (const campaign of campaignsToFetch) {
+                const { id } = campaign;
+
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+                const analytics = await axios.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                
+                result.push(campaign_analytics);
+            };
+
+            return res.status(200).json({
+                success: true,
+                result,
+                page: page_to_use,
+                totalPages
+            });
+
+        } catch (e) {
+            console.error("Error fetching all campaign analytics: " + e);
+            next(e);
+        };
+    };
+
+    async fetch_message_history(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+            const lead_id = req.query.lead_id;
+            const date = req.query.date;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
+
+            if (lead_id === null || lead_id === undefined || !lead_id) return res.status(400).json({ message: "LeadId is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            let url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads/${lead_id}/message-history?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            if (date) {
+                url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads/${lead_id}/message-history?api_key=${process.env.SMART_LEAD_API_KEY}&event_time_gt=${date}`;
+            };
+
+            const campaign = await axios.get(url);
+
+            const result = campaign.data;
+
+            if (!result) return res.status(400).json({ message: "history not found"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching message history from smartlead: " + e);
+            next(e);
+        };
+    };
+
+    async forward_email(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = ForwardReplySchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { campaignId, message_id, stats_id, to_emails } = body;
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/forward-email?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.post(url, {
+                message_id,
+                stats_id,
+                to_emails
+            });
+
+            console.log("campa: ", campaign);
+
+            const result = campaign.data;
+            console.log("result: ", result);
+
+            if (!result) return res.status(400).json({ message: "unable to forward message"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error forwarding reply via smartlead: " + e);
+            next(e);
+        };
+    };
+
+    async list_leads(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const result = campaign.data;
+
+            if (!result) return res.status(400).json({ message: "No leads found"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching list of leads: " + e);
+            next(e);
+        };
+    };
+
+    async reply_lead(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = ReplyLeadSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { campaignId, email_body, reply_message_id, reply_email_time, reply_email_body, cc, bcc, add_signature, to_first_name, to_last_name, to_email } = body;
+            const body_to_send = Object.entries({
+                email_body,
+                reply_message_id,
+                reply_email_time,
+                reply_email_body,
+                cc,
+                bcc,
+                add_signature,
+                to_first_name, 
+                to_last_name,
+                to_email
+            }).reduce((acc, [key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    acc[key] = value;
+                }
+                return acc;
+            }, {} as Record<string, any>);
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/reply-email-thread?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.post(url, body_to_send);
+
+            const result = campaign.data;
+            console.log("result: ", result);
+
+            if (result.ok !== "true") return res.status(400).json({ message: "unable to reply to lead"});
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error replying email lead: " + e);
+            next(e);
+        };
+    };
+
+    async campaign_dashboard(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+
+            const { id } = foundClient;
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const all_campaigns = campaign.data;
+
+            if (!all_campaigns) return res.status(400).json({ message: "No Analytics not found"});
+
+            const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id);
+
+            let result: Object[] = [];
+
+            for (const campaign of client_campaigns) {
+                const { id } = campaign;
+
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+                const analytics = await axios.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                
+                result.push(campaign_analytics);
+            };
+            
+            interface CampaignObject {
+                id: number,
+                user_id: number,
+                created_at: string,
+                status: string,
+                name: string,
+                sent_count: string,
+                open_count: string,
+                click_count: string,
+                reply_count: string,
+                block_count: string,
+                total_count: string,
+                sequence_count: string,
+                drafted_count: string,
+                tags: any,
+                unique_sent_count: string,
+                unique_open_count: string,
+                unique_click_count: string,
+                client_id: number,
+                bounce_count: string,
+                parent_campaign_id: any,
+                unsubscribed_count: string,
+                campaign_lead_stats: {
+                    total: number,
+                    paused: number,
+                    blocked: number,
+                    revenue: number,
+                    stopped: number,
+                    completed: number,
+                    inprogress: number,
+                    interested: number,
+                    notStarted: number
+                },
+                team_member_id: any,
+                send_as_plain_text: boolean,
+                client_name: string,
+                client_email: string,
+                client_company_name: string
+            };
+
+            const summedValues: { [key: string]: number } = {};
+
+            const parent_keys = ["sent_count", "open_count", "click_count", "reply_count", "bounce_count"];
+            const stat_keys = ["total", "interested"];
+
+            parent_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+            stat_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+
+            (result as CampaignObject[]).forEach((campaign: CampaignObject) => {
+                parent_keys.forEach((key) => {
+                    summedValues[key] += parseInt(campaign[key as keyof CampaignObject] as string) || 0;
+                });
+                
+                stat_keys.forEach((key) => {
+                    summedValues[key] += campaign.campaign_lead_stats[key as keyof typeof campaign.campaign_lead_stats] || 0;
+                });
+            });
+
+            const dashboard = {
+                total_sent: summedValues.sent_count,
+                replied: summedValues.reply_count,
+                opened: summedValues.open_count,
+                clicked: summedValues.click_count,
+                positive_reply: summedValues.interested,
+                bounced: summedValues.bounce_count,
+                contacts: summedValues.total
+            };
+
+            return res.status(200).json({
+                success: true,
+                result: {
+                    ...dashboard
+                }
+            });
+
+        } catch (e) {
+            console.error("Error fetching campaign dashboard: " + e);
+            next(e);
+        };
+    };
+
+    async campaign_overview(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+
+            const { id } = foundClient;
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const campaign = await axios.get(url);
+            const all_campaigns = campaign.data;
+
+            if (!all_campaigns) return res.status(400).json({ message: "No Analytics not found"});
+
+            const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id);
+
+            let result: Object[] = [];
+
+            for (const campaign of client_campaigns) {
+                const { id } = campaign;
+
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+                const analytics = await axios.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                
+                result.push(campaign_analytics);
+            };
+
+            interface CampaignObject {
+                id: number,
+                user_id: number,
+                created_at: string,
+                status: string,
+                name: string,
+                sent_count: string,
+                open_count: string,
+                click_count: string,
+                reply_count: string,
+                block_count: string,
+                total_count: string,
+                sequence_count: string,
+                drafted_count: string,
+                tags: any,
+                unique_sent_count: string,
+                unique_open_count: string,
+                unique_click_count: string,
+                client_id: number,
+                bounce_count: string,
+                parent_campaign_id: any,
+                unsubscribed_count: string,
+                campaign_lead_stats: {
+                    total: number,
+                    paused: number,
+                    blocked: number,
+                    revenue: number,
+                    stopped: number,
+                    completed: number,
+                    inprogress: number,
+                    interested: number,
+                    notStarted: number
+                },
+                team_member_id: any,
+                send_as_plain_text: boolean,
+                client_name: string,
+                client_email: string,
+                client_company_name: string
+            };
+
+            const summedValues: { [key: string]: number } = {};
+
+            const parent_keys = ["sent_count", "reply_count", "bounce_count"];
+            const stat_keys = ["total", "interested"];
+
+            parent_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+            stat_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+
+            (result as CampaignObject[]).forEach((campaign: CampaignObject) => {
+                parent_keys.forEach((key) => {
+                    summedValues[key] += parseInt(campaign[key as keyof CampaignObject] as string) || 0;
+                });
+                
+                stat_keys.forEach((key) => {
+                    summedValues[key] += campaign.campaign_lead_stats[key as keyof typeof campaign.campaign_lead_stats] || 0;
+                });
+            });
+
+            const bounce = (summedValues.bounce_count / summedValues.total) * 100;
+            const bounce_rate = bounce.toFixed(2) + "%";
+
+            const overview = {
+                emails_sent: summedValues.sent_count,
+                replies: summedValues.reply_count,
+                positive_responses: summedValues.interested,
+                bounces: summedValues.bounce_count,
+                total_contacts: summedValues.total,
+                bounce_rate
+            };
+
+            return res.status(200).json({
+                success: true,
+                result: {
+                    ...overview
+                }
+            });
+
+        } catch (e) {
+            console.error("Error fetching campaign overview: " + e);
+            next(e);
+        };
+    };
+
+    async add_webhook(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = AddWebhookSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { campaignId, name, webhook_url, event_types, categories } = body;
+
+            const body_to_send = {
+                id: null as number | null,
+                name,
+                webhook_url,
+                event_types,
+                categories
+            };
+
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/webhooks?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const webhook = await axios.post(url, body_to_send);
+            const response = webhook.data;
+
+            if (response.ok !== true) return res.status(400).json({ message: "unable to add webhook"});
+
+            return res.status(200).json({
+                success: true,
+                result: response
+            });
+
+        } catch (e) {
+            console.error("Error adding webhook: " + e);
+            next(e);
+        };
+    };
+
+    async email_sent_webhook(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const body = req.body;
+
+            console.log("email sent webhook: ", body);
+
+            const log = new WebhookModel(body);
+            await log.save();
+
+            return res.status(200).json({
+                success: true,
+                message: "email sent webhook received",
+            });
+
+        } catch (e) {
+            console.error("Error receiving email sent webhook: " + e);
+            next(e);
+        };
+    };
+
+    async fetch_agent_data(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = AgentDataSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { agentId } = body;
+            const dateOption = req.body.dateOption as DateOption;
+
+            let date_filter = {};
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = toZonedTime(now, timeZone);
+            const today = format(zonedNow, "yyyy-MM-dd", { timeZone });
+            const cur_now = DateTime.now().setZone("America/Los_Angeles");
+
+            const totalContacts = await contactModel.countDocuments({
+                agentId,
+                isDeleted: false
+            });
+
+            const totalNotCalled = await contactModel.countDocuments({
+                agentId,
+                isDeleted: false,
+                dial_status: callstatusenum.NOT_CALLED
+            });
+
+            switch (dateOption) {
+                case DateOption.Today:
+                    date_filter = { day: today };
+                    break;
+
+                case DateOption.Yesterday:
+                    const yest_zone = toZonedTime(subDays(now, 1), timeZone);
+                    const yesterday = format(yest_zone, "yyyy-MM-dd", { timeZone });
+                    date_filter = { day: yesterday };
+
+                    break;
+
+                case DateOption.ThisWeek:
+                    const weekdays: string[] = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = subDays(zonedNow, i);
+                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                        weekdays.push(valid_day);
+                    }
+                    date_filter = { day: { $in: weekdays } };
+
+                    break;
+
+                case DateOption.ThisMonth:
+                    const startOfMonth = cur_now.startOf("month");
+                    const todayDate = cur_now.startOf("day");
+
+                    const monthDates: string[] = [];
+                    let currentDate = startOfMonth;
+
+                    while (currentDate <= todayDate) {
+                        monthDates.push(currentDate.toFormat("yyyy-MM-dd"));
+
+                        currentDate = currentDate.plus({ days: 1 });
+                    };
+
+                    date_filter = { day: { $in: monthDates } };
+
+                    break;
+                
+                case DateOption.PastMonth:
+                    const startDate = cur_now.minus({ days: 30 }).startOf("day");
+
+                    const pastMonthDates: string[] = [];
+                    let currentDatePast = startDate;
+
+                    while (currentDatePast <= cur_now.startOf("day")) {
+                        pastMonthDates.push(currentDatePast.toFormat("yyyy-MM-dd"));
+                    
+                        currentDatePast = currentDatePast.plus({ days: 1 });
+                    };
+
+                    date_filter = { day: { $in: pastMonthDates } };
+
+                    break;
+
+                case DateOption.Total:
+                    date_filter = {};
+
+                    break;
+                
+                case DateOption.LAST_SCHEDULE:
+                    const recentJob = await jobModel
+                        .findOne({ agentId })
+                        .sort({ createdAt: -1 })
+                        .lean();
+
+                    if (recentJob) {
+                        const dateToCheck = recentJob.scheduledTime.split("T")[0];
+
+                        date_filter = { day: dateToCheck };
+
+                    } else {
+                        date_filter = {};
+                    };
+
+                    break;
+
+            };
+
+            const stats = await DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId,
+                        ...date_filter
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCalls: { $sum: "$totalCalls" },
+                        totalAnsweredByVm: { $sum: "$totalAnsweredByVm" },
+                        totalAppointment: { $sum: "$totalAppointment" },
+                        totalCallsTransffered: { $sum: "$totalTransffered" },
+                        totalFailedCalls: { $sum: "$totalFailed" },
+                        totalAnsweredCalls: { $sum: "$totalCallAnswered" },
+                        totalDialNoAnswer: { $sum: "$totalDialNoAnswer" },
+                        totalAnsweredByIVR: { $sum: "$totalAnsweredByIVR" },
+                        totalCallInactivity: { $sum: "$totalCallInactivity" },
+                        totalCallDuration: { $sum: "$totalCallDuration" },
+                    }
+                }
+            ]);
+
+            function convertMillisecondsToTime(milliseconds: number): string {
+                const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+                const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+              
+                const formattedHours = String(hours).padStart(2, '0');
+                const formattedMinutes = String(minutes).padStart(2, '0');
+                const formattedSeconds = String(seconds).padStart(2, '0');
+              
+                return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+            };
+
+            const milliseconds = stats[0]?.totalCallDuration || 0;
+
+            const combinedCallDuration = convertMillisecondsToTime(milliseconds);
+
+            const result = {
+                totalContacts,
+                totalCalls: stats[0]?.totalCalls || 0,
+                totalNotCalled,
+                totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
+                totalFailedCalls: stats[0]?.totalFailedCalls || 0,
+                totalAnsweredCalls: stats[0]?.totalAnsweredCalls || 0,
+                totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
+                totalCallsDuration: combinedCallDuration,
+                totalAppointments: stats[0]?.totalAppointment || 0
+            };
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+        } catch (e) {
+            console.error("Error fetching single agent stats" + e);
+            next(e);
+        };
+    };
+
+    async schedule_details(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const agentId = req.query.agentId as string;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const recent_schedule = await jobModel
+                .findOne({ agentId })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            if (!recent_schedule) return res.status(400).json({ message: "No schedule found"});
+
+            const { totalContactToProcess, scheduledTime, completedPercent } = recent_schedule;
+
+            const dateToCheck = scheduledTime.split("T")[0];
+
+            const stats = await DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId,
+                        day: dateToCheck
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCalls: { $sum: "$totalCalls" },
+                        totalAppointments: { $sum: "$totalAppointment" }
+                    }
+                }
+            ]);
+
+            const calls = stats[0]?.totalCalls || 0;
+            const bookings = stats[0]?.totalAppointments || 0;
+
+            const result = {
+                contacts: totalContactToProcess,
+                calls,
+                bookings,
+                scheduleProgress: Math.ceil(Number(completedPercent))
+            };
+ 
+            return res.status(200).json({
+                success: true,
+                ...result
+            });
+
+        } catch (e) {
+            console.error("Error fetching schedule details: " + e);
+            next(e);
+        };
+    };
+
+    async email_reply_webhook(request: AuthRequest, response: Response) {
+        try {
+            const body = request.body[0];
+
+            console.log("email reply webhook: ", body);
+
+            const clientId = body.clientId;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+
+            const foundClient = clients_data.find((client: ClientObject) => client.id === clientId);
+
+            if (!foundClient) {
+                console.error("Could not find client");
+            };
+
+            const client_name = foundClient.logo;
+
+            let client;
+
+            if (client_name === "Digital Mavericks Media") {
+                const client_details = await userModel.findOne({ name: client_name }).select("-password -passwordHash");
+
+                client = client_details._id;
+
+            } else if (client_name === "Cory Warfield") {
+                const client_details = await userModel.findOne({ name: "Cory Lopez-Warfield" }).select("-password -passwordHash");
+
+                client = client_details._id;
+
+            } else {
+                const client_details = await userModel.findOne({ name: client_name }).select("-password -passwordHash");
+
+                client = client_details._id;
+
+            };
+
+            const new_reply = await ReplyModel.create({
+                client,
+                ...body
+            });
+
+            if (!new_reply._id) {
+                console.error("Error creating new reply");
+            };
+
+        } catch (e) {
+            console.error("Error receiving email sent webhook: " + e);
+        };
+    };
+
+    async fetch_replies(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+
+            const { id } = foundClient;
+
+            const replies = await ReplyModel
+                .find({
+                    client_id: id,
+                    replied_to: false
+                })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            if (replies.length < 1) return res.status(200).json({ message: "No replies yet" });
+
+            return res.status(200).json({
+                success: true,
+                replies
+            });
+
+        } catch (e) {
+            console.error("Error fetching replies: " + e);
+            next(e);
+        };
+    };
+
+    async update_agent(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = UpdateAgentIdSchema.validate(body, { abortEarly: false});
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "Client not found"});
+
+            const { agentId, newAgentId } = body;
+
+            const check_agent = await userModel.findOne({ "agents.agentId": agentId });
+
+            if (!check_agent) return res.status(400).json({ message: "AgentId to replace not found" });
+
+            let successUpdates = [];
+            let failedUpdates = [];
+
+            const user = await userModel.updateOne(
+                { "agents.agentId": agentId },
+                { $set: {
+                        'agents.$.agentId': newAgentId
+                    }
+                }
+            );
+            if (user.acknowledged) {
+                successUpdates.push("user");
+            } else {
+                failedUpdates.push("user");
+            };
+
+            const retell = await contactModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (retell.acknowledged) {
+                successUpdates.push("contacts");
+            } else {
+                failedUpdates.push("contacts");
+            };
+
+            const transcript = await EventModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (transcript.acknowledged) {
+                successUpdates.push("transcripts");
+            } else {
+                failedUpdates.push("transcripts")
+            };
+
+            const job = await jobModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (job.acknowledged) {
+                successUpdates.push("job");
+            } else {
+                failedUpdates.push("job");
+            };
+
+            const graph = await dailyGraphModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (graph.acknowledged) {
+                successUpdates.push("graph");
+            } else {
+                failedUpdates.push("graph");
+            };
+
+            const daily = await DailyStatsModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (daily.acknowledged) {
+                successUpdates.push("daily");
+            } else {
+                failedUpdates.push("daily");
+            };
+
+            const history = await callHistoryModel.updateMany(
+                { agentId },
+                {
+                    $set: {
+                        agentId: newAgentId
+                    }
+                }
+            );
+            if (history.acknowledged) {
+                successUpdates.push("history");
+            } else {
+                failedUpdates.push("history");
+            };
+
+            return res.status(200).json({
+                successUpdates,
+                failedUpdates
+            });
+
+        } catch (e) {
+            console.error("Error updating agent" + e);
+            next(e);
         };
     };
 };
