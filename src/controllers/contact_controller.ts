@@ -181,6 +181,55 @@ export const getAllContact = async (
       },
     ]);
 
+    const totalAnsweredCalls = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: {$ne:callstatusenum.NOT_CALLED},
+    });
+
+    const totalAnsweredByIVR = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: callstatusenum.IVR,
+    });
+
+    
+    const totalAnsweredByVm = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: callstatusenum.VOICEMAIL,
+    });
+
+    
+    const totalCallsTransffered = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: callstatusenum.TRANSFERRED,
+    });
+
+    const totalCallotAnswered = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: callstatusenum.NO_ANSWER,
+    });
+
+    const totalCallInactivity = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: callstatusenum.INACTIVITY,
+    });
+
+    const totalAppointment = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: callstatusenum.SCHEDULED,
+    });
+    
+    const totalFailedCalls = await contactModel.countDocuments({
+      agentId,
+      isDeleted: false,
+      dial_status: callstatusenum.FAILED,
+    });
     const totalPages = Math.ceil(totalCount / limit);
 
     const statsWithTranscripts = await Promise.all(
@@ -213,16 +262,15 @@ export const getAllContact = async (
 
     return {
       totalContactForAgent,
-      totalAnsweredCalls: stats[0]?.totalAnsweredCalls || 0,
-      totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
-      totalAppointment: stats[0]?.totalAppointment || 0,
-      totalCallsTransffered: stats[0]?.totalCallsTransffered || 0,
+      totalAnsweredCalls,
+      totalAnsweredByVm,
+      totalAppointment,
+      totalCallsTransffered,
       totalNotCalledForAgent,
-      totalCalls: stats[0]?.totalCalls || 0,
-      totalFailedCalls: stats[0]?.totalFailedCalls || 0,
-      totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
-      totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
-      totalCallInactivity: stats[0]?.totalCallInactivity || 0,
+      totalFailedCalls,
+      totalAnsweredByIVR,
+      totalCallotAnswered,
+      totalCallInactivity,
       callDuration: combinedCallDuration,
       totalPages,
       contacts: statsWithTranscripts,

@@ -82,6 +82,7 @@ import { stat } from "fs/promises";
 import { script } from "./utils/script";
 import HTTP from "./middleware/handler";
 import routeHandlers from "./routes";
+import { recordModel } from "./models/recordModel";
 
 connectDb();
 // const smee = new SmeeClient({
@@ -143,6 +144,7 @@ export class Server {
     this.getAllDbTags();
     this.takeAgentId();
     this.handleContactSaving();
+    this.zap()
     this.handlecontactDelete();
     this.handlecontactGet();
     this.secondscript();
@@ -2160,7 +2162,7 @@ export class Server {
     this.app.post("/make", async (req: Request, res: Response) => {
       try {
         // Fetch data from the ContactModel
-        const contacts = await contactModel.find({agentId:"agent_07ff7f6c39540e4e71a5c71385", isDeleted:false, isOnDNCList:false}).populate("referenceToCallId").limit(10) // Fetch all contacts
+        const contacts = await contactModel.find({agentId:"agent_07ff7f6c39540e4e71a5c71385", isDeleted:false, isOnDNCList:false, dial_status:"connected-user"}).populate("referenceToCallId").limit(10) // Fetch all contacts
         if (!contacts || contacts.length === 0) {
           return res.status(404).send("No contacts found in the database.");
         }
@@ -2964,7 +2966,7 @@ export class Server {
   testingZap() {
     this.app.post("/zapTest", async (req: Request, res: Response) => {
       try {
-        const data = {
+        const data = {"leads":[{
           firstname: "Nick",
           lastname: "Bernadini",
           email: "info@ixperience.io",
@@ -2976,8 +2978,36 @@ export class Server {
             transcript: "This is test data fron intuitiveagent",
             duration: "00:00;05",
             timestamp: "2024-12-09",
-          },
-        };
+          }
+        }, {
+          firstname: "Jane",
+          lastname: "Doe",
+          email: "janedoe@gmail.com",
+          phone: "+1727223723",
+          AI_Voice_Agent: {
+            call_recording_url:
+              "https://dxc03zgurdly9.cloudfront.net/call_decee1f115d524a67bcbe8f2a6/recording.wav",
+            status: "call-ended",
+            transcript: "This is test data fron intuitiveagent",
+            duration: "00:00;05",
+            timestamp: "2024-12-09",
+          }
+        },
+        {
+          firstname:"Micheal",
+          lastname: "Doe",
+          email: "michealdoe@gmail.com",
+          phone: "+1727223723",
+          AI_Voice_Agent: {
+            call_recording_url:
+              "https://dxc03zgurdly9.cloudfront.net/call_decee1f115d524a67bcbe8f2a6/recording.wav",
+            status: "call-ended",
+            transcript: "This is test data fron intuitiveagent",
+            duration: "00:00;05",
+            timestamp: "2024-12-09",
+          }
+        },
+      ]}
 
         const result = axios.post(process.env.ZAP_URL, data);
         console.log("don3");
@@ -3503,7 +3533,6 @@ export class Server {
       }
     });
   }
-
   graphChartAdmin() {
     this.app.post("/graph-stats-admin", async (req: Request, res: Response) => {
       try {
@@ -3976,4 +4005,52 @@ export class Server {
       }
     });
   }
+ 
+  
+  zap() {
+    this.app.post("/zap", async (req, res) => {
+      try {
+        // Fetch all contacts with a valid referenceToCallId
+        const contacts = await contactModel.find({
+          agentId: "agent_1852d8aa89c3999f70ecba92b8",
+          referenceToCallId: { $ne: null }, // Skip null or undefined referenceToCallId
+        });
+  
+        // Initialize an array to store the mapped leads
+        const leads = [];
+  
+        // Loop through each contact and fetch the corresponding record
+        for (const contact of contacts) {
+          const record = await recordModel.findOne({ callId: contact.referenceToCallId });
+  
+          // If the record exists and has the desired sentiment, map the data
+          if (record && record.sentiment === "scheduled") {
+            leads.push({
+              firstname: contact.firstname || "",
+              lastname: contact.lastname || "",
+              email: contact.email || "",
+              phone: contact.phone || "",
+              AI_Voice_Agent: {
+                call_recording_url: record.recordingUrl || "",
+                status: record.status || "",
+                transcript: record.transcript || "",
+                duration: record.duration || "",
+                timestamp: record.starttimestamp || "",
+              },
+            });
+          }
+        }
+  
+        // Prepare the response data
+        const data = { leads };
+  
+        // Send the response
+        res.status(200).json(data);
+      } catch (error) {
+        console.error("Error: ", error);
+        res.status(500).send("An error occurred while processing your request.");
+      }
+    });
+  }
+  
 }

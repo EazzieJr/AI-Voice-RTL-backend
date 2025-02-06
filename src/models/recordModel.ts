@@ -1,5 +1,31 @@
 import { model, Schema } from "mongoose";
-const recordSchema = new Schema({
+
+interface IRecord extends Document {
+  firstname?: string;
+  lastname?: string;
+  email?: string;
+  address?: string;
+  jobid?: string;
+  callId?: string;
+  agentId?: string;
+  status?: string;
+  starttimestamp?: string;
+  endtimestamp?: string;
+  transcript?: string;
+  duration?: string;
+  publiclogurl?: string;
+  fromNumber?: string;
+  toNumber?: string;
+  disconnectionReason?: string;
+  summary?: string;
+  callType?: string;
+  dial_status?: string;
+  date?: string;
+  recordingUrl?: string;
+  sentiment?: string;
+  callSuccessful?: string;
+}
+const recordSchema = new Schema<IRecord>({
   firstname: { type: String },
   lastname: { type: String },
   email: { type: String },
