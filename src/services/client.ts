@@ -18,6 +18,7 @@ import { dailyGraphModel } from "../models/graphModel";
 import axios from "axios";
 import { WebhookModel } from "../models/webhook";
 import { ReplyModel } from "../models/emailReply";
+import { limits } from "argon2";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -1588,6 +1589,8 @@ class ClientService extends RootService {
     async fetch_replies(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
         try {
             const clientId = req.user._id;
+            const page = req.query.page as string;
+
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
@@ -1634,9 +1637,28 @@ class ClientService extends RootService {
 
             if (replies.length < 1) return res.status(200).json({ message: "No replies yet" });
 
+            const limit = 50;
+
+            const page_to_use = parseInt(page) || 1; 
+            const totalRecords = replies.length;
+            const totalPages = Math.ceil(totalRecords / limit);
+
+            if (page_to_use > totalPages) {
+                return res.status(400).json({
+                    error: "Page exceeds available data"
+                })
+            };
+
+            const startIndex = (page_to_use - 1) * limit;
+            const endIndex = page_to_use * limit;
+
+            const result = replies.slice(startIndex, endIndex);
+
             return res.status(200).json({
                 success: true,
-                replies
+                result,
+                page: page_to_use,
+                totalPages
             });
 
         } catch (e) {
