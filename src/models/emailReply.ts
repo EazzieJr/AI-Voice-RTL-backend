@@ -109,6 +109,9 @@ const replySchema = new Schema({
     },
     replied_to: {
         type: Boolean
+    },
+    mail_read: {
+        type: Boolean
     }
 }, { timestamps: true });
 
