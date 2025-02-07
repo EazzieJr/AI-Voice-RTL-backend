@@ -132,24 +132,17 @@ class ClientService extends RootService {
                     break;
             };
 
-            // const foundContacts = await contactModel
-            //     .find({
-            //         agentId: { $in: agentIds },
-            //         isDeleted: false,
-            //         ...dateFilter
-            //     });
-
             const totalContactForAgent = await contactModel.countDocuments({
                 agentId: { $in: agentIds },
                 isDeleted: false
             });
 
-            const totalNotCalledForAgent = await contactModel.countDocuments({
-                agentId: { $in: agentIds },
-                isDeleted: false,
-                dial_status: callstatusenum.NOT_CALLED,
-                ...dateFilter
-            });
+            // const totalNotCalledForAgent = await contactModel.countDocuments({
+            //     agentId: { $in: agentIds },
+            //     isDeleted: false,
+            //     dial_status: callstatusenum.NOT_CALLED,
+            //     ...dateFilter
+            // });
 
             const totalAnsweredCalls = await contactModel.countDocuments({
                 agentId: { $in: agentIds },
@@ -190,22 +183,31 @@ class ClientService extends RootService {
                 return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
             }
 
-            const combinedCallDuration = convertMsToMinSec(stats[0]?.totalCallDuration || 0);             
+            const combinedCallDuration = convertMsToMinSec(stats[0]?.totalCallDuration || 0);
 
+            const totalCalls = stats[0]?.totalCalls || 0;
+            const answerRate = (totalAnsweredCalls / totalCalls) * 100;
+
+            const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
+
+            const automatedRate = (automatedAnswers / totalCalls) * 100;
 
             return res.status(200).json({
                 totalContactForAgent,
                 totalAnsweredCalls,
-                totalNotCalledForAgent,
+                answerRate: `${answerRate.toFixed(2)}%`,
+                // totalNotCalledForAgent,
                 callDuration: combinedCallDuration,
-                totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
+                totalAutomatedAnswers: automatedAnswers,
+                automatedRate: `${automatedRate.toFixed(2)}%`,
+                // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
                 totalAppointment: stats[0]?.totalAppointment || 0,
                 totalCallsTransffered: stats[0]?.totalCallsTransffered || 0,
-                totalCalls: stats[0]?.totalCalls || 0,
-                totalFailedCalls: stats[0]?.totalFailedCalls || 0,
-                totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
-                totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
-                totalCallInactivity: stats[0]?.totalCallInactivity || 0
+                totalCalls,
+                // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
+                // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
+                // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
+                // totalCallInactivity: stats[0]?.totalCallInactivity || 0
             });
 
         } catch (error) {
