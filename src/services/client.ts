@@ -1844,8 +1844,9 @@ class ClientService extends RootService {
                 const minutes = Math.floor(totalSeconds / 60);
                 const seconds = totalSeconds % 60;
 
-                return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-            }
+                // return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+                return `${String(minutes).padStart(2, "0")}/5000`;
+            };
 
             const minutesUsed = convertMsToMinSec(stats[0]?.totalCallDuration || 0);
 
