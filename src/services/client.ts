@@ -1796,6 +1796,69 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
+    async minutes_used(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = toZonedTime(now, timeZone);
+            const today = format(zonedNow, "yyyy-MM-dd", { timeZone });
+
+            const monthDates: string[] = [];
+            for (let i = 0; i < now.getDate(); i++) {
+                const day = subDays(now, i);
+                const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                monthDates.unshift(valid_day);
+            };
+
+            const { agents } = check_user;
+
+            const agentId = agents[0].agentId;
+
+            const stats = await DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId: agentId,
+                        day: {
+                            $in: monthDates
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCallDuration: {
+                            $sum: "$totalCallDuration"
+                        }
+                    }
+                }
+            ]);
+
+            function convertMsToMinSec(ms: number): string {
+                const totalSeconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+
+                return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+            }
+
+            const minutesUsed = convertMsToMinSec(stats[0]?.totalCallDuration || 0);
+
+            return res.status(200).json({
+                success: true,
+                minutesUsed
+            });
+
+        } catch (e) {
+            console.error("Error fetching minutes used: " + e);
+            next(e);
+        };
+    };
 };
 
 export const client_service = new ClientService();

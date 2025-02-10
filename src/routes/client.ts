@@ -55,4 +55,6 @@ router
 
     .post("/agent-update", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.update_agent(req, res, next))
 
+    .get("/minutes-used", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.minutes_used(req, res, next))
+
 export default router; 
