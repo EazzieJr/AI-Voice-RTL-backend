@@ -1632,7 +1632,7 @@ class ClientService extends RootService {
             const replies = await ReplyModel
                 .find({
                     client_id: id,
-                    replied_to: false
+                    mail_read: false
                 })
                 .sort({ createdAt: -1 })
                 .lean();
