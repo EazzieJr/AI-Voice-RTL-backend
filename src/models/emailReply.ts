@@ -1,6 +1,4 @@
-import { number } from "joi";
 import { model, Schema } from "mongoose";
-import { StringDecoder } from "string_decoder";
 
 const replySchema = new Schema({
     _id: {

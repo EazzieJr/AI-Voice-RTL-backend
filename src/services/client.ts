@@ -925,10 +925,33 @@ class ClientService extends RootService {
 
             if (result.ok !== "true") return res.status(400).json({ message: "unable to reply to lead"});
 
-            return res.status(200).json({
-                success: true,
-                result
-            });
+            // return res.status(200).json({
+            //     success: true,
+            //     result
+            // });
+
+            const update_reply = await ReplyModel.updateOne(
+                {
+                    campaign_id: campaignId,
+                    message_id: reply_message_id,
+                    replied_to: false
+                },
+                { replied_to: true }
+            );
+
+            if (!update_reply.acknowledged) {
+                return res.status(200).json({
+                    success: true,
+                    result
+                });
+
+            } else {
+                return res.status(200).json({
+                    success: true,
+                    message: "Reply made but Unable to update replied_to status in db",
+                    result
+                });
+            }
 
         } catch (e) {
             console.error("Error replying email lead: " + e);
