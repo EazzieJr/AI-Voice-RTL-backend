@@ -1504,7 +1504,9 @@ class ClientService extends RootService {
 
             if (!recent_schedule) return res.status(400).json({ message: "No schedule found"});
 
-            const { totalContactToProcess, scheduledTime, completedPercent } = recent_schedule;
+            const { totalContactToProcess, scheduledTime, completedPercent, tagProcessedFor, processedContacts } = recent_schedule;
+
+            const contactsRemaining = totalContactToProcess - processedContacts || 0;
 
             const dateToCheck = scheduledTime.split("T")[0];
 
@@ -1528,10 +1530,13 @@ class ClientService extends RootService {
             const bookings = stats[0]?.totalAppointments || 0;
 
             const result = {
+                name: tagProcessedFor,
                 contacts: totalContactToProcess,
                 calls,
                 bookings,
-                scheduleProgress: Math.ceil(Number(completedPercent))
+                scheduleProgress: Math.ceil(Number(completedPercent)),
+                contactsRemaining,
+                contactsDone: processedContacts,
             };
  
             return res.status(200).json({
