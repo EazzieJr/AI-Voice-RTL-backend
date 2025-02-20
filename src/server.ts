@@ -570,6 +570,11 @@ export class Server {
         if (agentId) {
           query["agentId"] = agentId;
         }
+
+        query["dial_status"] = {
+          $ne: callstatusenum.SCHEDULED,
+        }
+
         const result = await contactModel.updateMany(query, {
           dial_status: callstatusenum.NOT_CALLED,
           answeredByVM: false,
