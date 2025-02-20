@@ -1504,11 +1504,38 @@ class ClientService extends RootService {
 
             if (!recent_schedule) return res.status(400).json({ message: "No schedule found"});
 
-            const { totalContactToProcess, scheduledTime, completedPercent, tagProcessedFor, processedContacts } = recent_schedule;
-
-            const contactsRemaining = totalContactToProcess - processedContacts || 0;
+            const { scheduledTime, tagProcessedFor } = recent_schedule;
 
             const dateToCheck = scheduledTime.split("T")[0];
+
+            const startDate = `${dateToCheck}T00:00:00.000`;
+            const endDate = `${dateToCheck}T23:59:59.999`;
+
+            const schedules = await jobModel.find({
+                agentId,
+                scheduledTime: {
+                    $gte: startDate,
+                    $lte: endDate
+                }
+            });
+
+            let allContactsToProcess: number = 0;
+            let allCompletedPercent: number = 0;
+            let allProcessedContacts: number = 0;
+
+            console.log("sched: ", schedules);
+
+            for (const schedule of schedules) {
+                console.log("schedule: ", schedule);
+                const { totalContactToProcess, completedPercent, processedContacts } = schedule;
+
+                allContactsToProcess += totalContactToProcess;
+                allCompletedPercent += parseInt(completedPercent);
+                allProcessedContacts += processedContacts;
+            };
+
+            const contactsRemaining = allContactsToProcess - allProcessedContacts || 0;
+            const completedPercent = allCompletedPercent / schedules.length;
 
             const stats = await DailyStatsModel.aggregate([
                 {
@@ -1531,12 +1558,12 @@ class ClientService extends RootService {
 
             const result = {
                 name: tagProcessedFor,
-                contacts: totalContactToProcess,
+                contacts: allContactsToProcess,
                 calls,
                 bookings,
                 scheduleProgress: Math.ceil(Number(completedPercent)),
                 contactsRemaining,
-                contactsDone: processedContacts,
+                contactsDone: allProcessedContacts,
             };
  
             return res.status(200).json({
