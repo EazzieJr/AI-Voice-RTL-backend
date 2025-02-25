@@ -57,4 +57,6 @@ router
 
     .get("/minutes-used", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.minutes_used(req, res, next))
 
+    .get("/trigger-lead-calls", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.trigger_lead_calls(req, res, next))
+
 export default router; 

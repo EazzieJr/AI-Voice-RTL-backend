@@ -110,6 +110,12 @@ const replySchema = new Schema({
     },
     mail_read: {
         type: Boolean
+    },
+    phone: {
+        type: Number
+    },
+    is_meeting_request: {
+        type: Boolean
     }
 }, { timestamps: true });
 

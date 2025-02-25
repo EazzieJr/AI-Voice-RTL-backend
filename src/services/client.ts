@@ -18,7 +18,6 @@ import { dailyGraphModel } from "../models/graphModel";
 import axios from "axios";
 import { WebhookModel } from "../models/webhook";
 import { ReplyModel } from "../models/emailReply";
-import { limits } from "argon2";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -1914,6 +1913,77 @@ class ClientService extends RootService {
             console.error("Error fetching minutes used: " + e);
             next(e);
         };
+    };
+
+    async trigger_lead_calls(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { name } = check_user;
+
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+            const clients = await axios.get(clients_url);
+            const clients_data = clients.data;
+
+            let foundClient;
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+            
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
+            } else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            }
+
+            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead"});
+
+            const { id } = foundClient;
+
+            const leads_to_call = await ReplyModel.find({
+                client_id: id,
+                is_meeting_request: true,
+                phone: {
+                    $exists: true,
+                    $ne: ""
+                }
+            }, "phone");
+
+            const phoneNumbers = leads_to_call.map((lead) => lead.phone);
+            console.log("phoneNumbers: ", phoneNumbers);
+
+            if (phoneNumbers.length < 1) return res.status(200).json({ message: "No leads to call" });
+
+            this.call_leads(phoneNumbers);
+
+            return res.status(200).json({
+                success: true,
+                message: "Lead calls triggered"
+            });
+
+        } catch (e) {
+            console.error("Error triggering lead calls: " + e);
+            next(e);
+        };
+    };
+
+    async call_leads(leads: number[]) {
+        console.log("inside call leads");
     };
 };
 
