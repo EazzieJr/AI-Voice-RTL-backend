@@ -1,6 +1,57 @@
 import { model, Schema } from "mongoose";
 
-const replySchema = new Schema({
+export interface IReply {
+    _id: string;
+    campaign_name?: string;
+    campaign_id?: number;
+    client_id?: number;
+    webhook_id?: number;
+    webhook_name?: string;
+    campaign_status?: string;
+    message_id?: string;
+    stats_id?: string;
+    from_email: string;
+    preview_text?: string;
+    subject?: string;
+    time_replied?: string;
+    sent_message?: {
+        message_id?: string;
+        html?: string;
+        text?: string;
+        time?: string;
+    };
+    to_email: string;
+    to_name?: string;
+    event_timestamp?: string;
+    promptType?: string;
+    reply_body?: string;
+    reply_category?: number;
+    reply_message?: {
+        message_id?: string;
+        html?: string;
+        text?: string;
+        time?: string;
+    };
+    sent_message_body?: string;
+    sequence_number?: number;
+    secret_key?: string;
+    app_url?: string;
+    description?: string;
+    ui_master_inbox_link?: string;
+    metadata?: {
+        webhook_created_at?: Date;
+    };
+    event_type?: string;
+    sl_email_lead_id?: number;
+    sl_email_lead_map_id?: number;
+    sl_lead_email?: string;
+    replied_to?: boolean;
+    mail_read?: boolean;
+    phone?: number;
+    is_meeting_request?: boolean;
+}
+
+const replySchema = new Schema<IReply>({
     _id: {
         type: String
     },
@@ -119,4 +170,6 @@ const replySchema = new Schema({
     }
 }, { timestamps: true });
 
-export const ReplyModel = model("EmailReply", replySchema);
+export const ReplyModel = model<IReply>("EmailReply", replySchema);
+
+// export const ReplyModel = model("EmailReply", replySchema);

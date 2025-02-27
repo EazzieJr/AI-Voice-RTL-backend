@@ -17,7 +17,7 @@ import { DateTime } from "luxon";
 import { dailyGraphModel } from "../models/graphModel";
 import axios from "axios";
 import { WebhookModel } from "../models/webhook";
-import { ReplyModel } from "../models/emailReply";
+import { IReply, ReplyModel } from "../models/emailReply";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -1954,6 +1954,7 @@ class ClientService extends RootService {
             if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead"});
 
             const { id } = foundClient;
+            console.log("client id: ", id);
 
             const leads_to_call = await ReplyModel.find({
                 client_id: id,
@@ -1962,14 +1963,13 @@ class ClientService extends RootService {
                     $exists: true,
                     $ne: ""
                 }
-            }, "phone");
+            });
 
-            const phoneNumbers = leads_to_call.map((lead) => lead.phone);
-            console.log("phoneNumbers: ", phoneNumbers);
+            console.log("leads to call: ", leads_to_call);
 
-            if (phoneNumbers.length < 1) return res.status(200).json({ message: "No leads to call" });
+            if (leads_to_call.length < 1) return res.status(200).json({ message: "No leads to call" });
 
-            this.call_leads(phoneNumbers);
+            this.call_leads(leads_to_call);
 
             return res.status(200).json({
                 success: true,
@@ -1982,7 +1982,7 @@ class ClientService extends RootService {
         };
     };
 
-    async call_leads(leads: number[]) {
+    async call_leads(leads: IReply[]) {
         console.log("inside call leads");
     };
 };
