@@ -1526,8 +1526,10 @@ class ClientService extends RootService {
 
             for (const schedule of schedules) {
                 console.log("schedule: ", schedule);
-                const { totalContactToProcess, completedPercent, processedContacts } = schedule;
-
+                const totalContactToProcess = schedule.totalContactToProcess ?? 0;
+                const completedPercent = schedule.completedPercent || "0";
+                const processedContacts = schedule.processedContacts || 0;
+                
                 allContactsToProcess += totalContactToProcess;
                 allCompletedPercent += parseInt(completedPercent);
                 allProcessedContacts += processedContacts;
