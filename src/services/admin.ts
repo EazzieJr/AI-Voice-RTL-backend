@@ -3,21 +3,21 @@ import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/authRequest";
 import { SearchClientSchema } from "../validations/admin";
 import { contactModel } from "../models/contact_model";
-import { IContact } from "../utils/types";
+import { callstatusenum, IContact } from "../utils/types";
 
 
 class AdminService extends RootService {
 
     private static getStatusOption(statusOption: string): string | undefined {
         const statusMapping: { [key: string]: string } = {
-            called: 'CALLED',
-            'not-called': 'NOT_CALLED',
-            voicemail: 'VOICEMAIL',
-            failed: 'FAILED',
-            transferred: 'TRANSFERRED',
-            scheduled: 'SCHEDULED',
-            ivr: 'IVR',
-            inactivity: 'INACTIVITY',
+            called: callstatusenum.CALLED,
+            'not-called': callstatusenum.NOT_CALLED,
+            voicemail: callstatusenum.VOICEMAIL,
+            failed: callstatusenum.FAILED,
+            transferred: callstatusenum.TRANSFERRED,
+            scheduled: callstatusenum.SCHEDULED,
+            ivr: callstatusenum.IVR,
+            inactivity: callstatusenum.INACTIVITY,
         };
         return statusMapping[statusOption.toLowerCase()];
     };
@@ -97,6 +97,8 @@ class AdminService extends RootService {
                     return res.status(400).json({ message: "start date is required" });
                 };
             };
+
+            console.log("Query: ", query);
 
             let results;
             let totalRecords;
