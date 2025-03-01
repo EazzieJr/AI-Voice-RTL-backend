@@ -59,4 +59,6 @@ router
 
     .get("/trigger-lead-calls", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.trigger_lead_calls(req, res, next))
 
+    .post("/sentiment-transcript", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.sentiment_correction_script(req, res, next))
+
 export default router; 

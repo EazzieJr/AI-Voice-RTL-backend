@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -18,6 +18,7 @@ import { dailyGraphModel } from "../models/graphModel";
 import axios from "axios";
 import { WebhookModel } from "../models/webhook";
 import { IReply, ReplyModel } from "../models/emailReply";
+import { reviewTranscript } from "../utils/transcript-review";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -1986,6 +1987,49 @@ class ClientService extends RootService {
 
     async call_leads(leads: IReply[]) {
         console.log("inside call leads");
+    };
+
+    async sentiment_correction_script(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const body = req.body;
+
+            const { error } = ContactsSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const { contacts } = body;
+
+            for (const contact of contacts) {
+                const fetch_contact = await contactModel.findOne({ _id: contact })
+                    .populate("referenceToCallId");
+                if (!fetch_contact) return res.status(400).json({ message: `contact ${contact} not found`});
+
+                const { referenceToCallId } = fetch_contact;
+                const { _id, transcript } = referenceToCallId;
+
+                const review = await reviewTranscript(transcript);
+                const sentiment = review.message.content;
+
+                const result = await EventModel.updateOne(
+                    { _id },
+                    { 
+                        userSentiment: sentiment,
+                        analyzedTranscript: sentiment
+                    }
+                );
+
+                if (!result.acknowledged) return res.status(400).json({ message: `unable to update sentiment for contact ${contact}`});
+
+            };
+
+            return res.status(200).json({
+                success: true,
+                message: "sentiments updated for contacts"
+            });
+
+        } catch (e) {
+            console.error("Error correcting sentiment: " + e);
+            next(e);
+        };
     };
 };
 

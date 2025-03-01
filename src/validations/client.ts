@@ -63,3 +63,7 @@ export const UpdateAgentIdSchema = Joi.object({
     agentId: Joi.string().required(),
     newAgentId: Joi.string().required()
 });
+
+export const ContactsSchema = Joi.object({
+    contacts: Joi.array().items(Joi.string().hex().length(24))
+});
