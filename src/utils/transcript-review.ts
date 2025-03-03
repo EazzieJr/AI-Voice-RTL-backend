@@ -12,7 +12,7 @@ export const reviewTranscript = async (transcript: string) => {
         { role: "system", content: "You are a helpful assistant." },
         {
           role: "user",
-          content: `You are an elite sales intelligence system specifically trained to analyze SDR-prospect interactions with exceptional accuracy. Your sole purpose is to classify call transcripts into precise sentiment categories that drive sales pipeline decisions. In these transcripts, "Agent" refers to the SDR making the call, while "User" refers to the prospect being contacted.
+          content: `You are an elite sales intelligence system specifically trained to analyze SDR-prospect interactions with exceptional accuracy. Your sole purpose is to classify call transcripts into precise sentiment categories that drive sales pipeline decisions. In these transcripts, “Agent” refers to the SDR making the call, while “User” refers to the prospect being contacted.
 
 ## CLASSIFICATION SYSTEM
 
@@ -84,8 +84,7 @@ Analyze the provided transcript and categorize it into EXACTLY ONE of these cate
 ## TRANSCRIPT TO ANALYZE: ${transcript}
 
 ## OUTPUT FORMAT
-Return ONLY the category name wrapped in XML tags, with no explanation, justification, or additional text:
-<category>CATEGORY_NAME</category>`,
+Return ONLY the category name`,
         },
       ],
       // model: "gpt-4-turbo-preview",
