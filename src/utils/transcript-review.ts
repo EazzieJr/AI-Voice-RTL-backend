@@ -12,27 +12,80 @@ export const reviewTranscript = async (transcript: string) => {
         { role: "system", content: "You are a helpful assistant." },
         {
           role: "user",
-          content: `You are an expert data analyst specializing in sentiment analysis of call transcripts between AI agents and prospects. Your task is to analyze the transcript and accurately categorize the conversation based on the prospect's responses. Use one of the following sentiment analysis categories:
+          content: `You are an elite sales intelligence system specifically trained to analyze SDR-prospect interactions with exceptional accuracy. Your sole purpose is to classify call transcripts into precise sentiment categories that drive sales pipeline decisions. In these transcripts, "Agent" refers to the SDR making the call, while "User" refers to the prospect being contacted.
 
-Categories:
-positive: The prospect either clearly expresses interest—agreeing to book an appointment or actively discussing next steps—or requests a follow-up, suggesting the agent call back later or follow up in the future.
-negative: The prospect explicitly says they are not interested, no longer interested, have found another solution, or expresses disinterest.
-neutral: The prospect does not explicitly say they are interested or not interested, or express they are undecided at the moment. 
-scheduled: The prospect agrees to scheduling a call, appointment or meeting, chooses one of the provided time slots, or confirms a specific time for an appointment or meeting.
-call-back: The prospect request the agent to call back at another time, was busy and not able to talk at that time.
-unknown: The call ends abruptly, or the transcription is not clear or has errors making it difficult to accurately categorize the sentiment.
-dnc: he prospect is angry and explicitly mentions they never want to be called again, ask to be removed from the list and not receive any calls in the future.
+## CLASSIFICATION SYSTEM
 
-Here is the transcript to analyze: ${transcript}
+Analyze the provided transcript and categorize it into EXACTLY ONE of these categories:
 
-Instructions:
-1. Carefully read and analyze the call transcript provided above.
-2. If the transcript is empty or missing, categorize it as 'unknown'.
-3. Based on the prospect's responses, assign the most accurate category from the list provided.
-4. Respond only with the accurate category name, without any additional explanation or justification.
+- POSITIVE: Prospect demonstrates clear buying signals through one or more of:
+  * Expressing explicit interest in the product/service
+  * Asking detailed questions about features, pricing, or implementation
+  * Discussing potential use cases within their organization
+  * Using phrases like "sounds interesting", "tell me more", or "that could work for us"
+  * Engaging in extended dialogue about how the solution might fit their needs
+  
+- NEGATIVE: Prospect demonstrates clear rejection signals through one or more of:
+  * Explicitly stating they are not interested or have no need
+  * Mentioning they've selected a competitor or alternative solution
+  * Using dismissive language or tone throughout the conversation
+  * Providing objections without requesting solutions to those objections
+  * Repeatedly attempting to end the conversation quickly
 
-Output your response in the following format:
-<category>Insert category name here</category>`,
+- NEUTRAL: Prospect remains in evaluation mode, characterized by:
+  * Asking factual questions without emotional indicators
+  * Neither rejecting nor accepting the premise of the solution
+  * Maintaining professional but non-committal language
+  * Requesting information to be sent for later review
+  * Delegating the decision to another stakeholder
+
+- SCHEDULED: Prospect commits to a specific next step with clear temporal commitment:
+  * Agreeing to a calendar invitation or specific date/time
+  * Selecting from offered time slots
+  * Proposing their own availability for a meeting
+  * Confirming attendance at a demo, presentation, or discovery call
+  * Using language that confirms a scheduled event ("I'll see you Tuesday at 2pm")
+
+- CALL BACK: Prospect explicitly requests future contact without current commitment:
+  * Indicating they are currently busy but open to future conversation
+  * Specifying a future timeframe for reconnection ("call me next quarter")
+  * Mentioning upcoming events that must occur before further discussion
+  * Requesting postponement due to timing issues
+  * Using phrases like "not right now, but later" or "try me again in [timeframe]"
+
+- UNKNOWN: Transcript contains insufficient information for accurate classification:
+  * Call disconnected prematurely
+  * Technical issues with recording or transcription
+  * Unintelligible responses or excessive redactions
+  * Language barriers preventing clear communication
+  * Missing critical portions of the conversation
+
+- DNC (DO NOT CALL): Prospect explicitly requests termination of all future contact:
+  * Using forceful language to reject future communications
+  * Explicitly requesting removal from calling lists
+  * Threatening legal action if contacted again
+  * Expressing anger or frustration about being contacted
+  * Using phrases like "never call again" or "remove me from your database"
+
+## TRANSCRIPT ANALYSIS INSTRUCTIONS
+
+1. Read the entire transcript to understand the full context before classification
+2. IMPORTANT: Focus ONLY on lines prefixed with "User:" as these represent the prospect's responses
+3. IGNORE all content from lines prefixed with "Agent:" as these represent the SDR's statements
+4. Pay careful attention to the prospect's (User's) final statements, which often contain the clearest sentiment indicators
+5. Weigh the prospect's verbal cues more heavily than the agent's prompts or questions
+6. Look for pattern shifts during the conversation (initial rejection that turns to interest, etc.)
+7. Prioritize explicit statements over implied meanings
+8. If classification is borderline between two categories, select based on the most actionable next step for the SDR
+9. If transcript is empty, corrupted, or incomplete, classify as 'UNKNOWN'
+10. Remember: ONLY the User's responses determine the sentiment classification
+
+
+## TRANSCRIPT TO ANALYZE: ${transcript}
+
+## OUTPUT FORMAT
+Return ONLY the category name wrapped in XML tags, with no explanation, justification, or additional text:
+<category>CATEGORY_NAME</category>`,
         },
       ],
       // model: "gpt-4-turbo-preview",
