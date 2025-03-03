@@ -12,22 +12,27 @@ export const reviewTranscript = async (transcript: string) => {
         { role: "system", content: "You are a helpful assistant." },
         {
           role: "user",
-          content: `You are an expert data analyst specializing in sentiment analysis of call transcripts between AI agents and leads. Your task is to accurately categorize each conversation based on the lead's responses. Please use one of the following categories:
+          content: `You are an expert data analyst specializing in sentiment analysis of call transcripts between AI agents and prospects. Your task is to analyze the transcript and accurately categorize the conversation based on the prospect's responses. Use one of the following sentiment analysis categories:
 
 Categories:
-interested: The lead either clearly expresses interest—agreeing to book an appointment or actively discussing next steps—or requests a follow-up, suggesting the agent call back later or follow up in the future.
-not-interested: The lead explicitly says they are no longer interested, have found a solution, or expresses disinterest.
-scheduled: The lead confirms a specific time for an appointment or meeting.
-incomplete: The call ends abruptly, or the lead cannot be reached before answering any key questions.
-voicemail: Based on the content of this call transcript, identify whether this is an AM/VM (Answering Machine/Voice Mail)
-dnc: The lead explicitly says they never want to be called back again or ask to be removed from the list and not be called again
-ivr: Based on the content of this call transcript, identify whether this is an IVR (Interactive Voice Response) system.
-Instructions
+positive: The prospect either clearly expresses interest—agreeing to book an appointment or actively discussing next steps—or requests a follow-up, suggesting the agent call back later or follow up in the future.
+negative: The prospect explicitly says they are not interested, no longer interested, have found another solution, or expresses disinterest.
+neutral: The prospect does not explicitly say they are interested or not interested, or express they are undecided at the moment. 
+scheduled: The prospect agrees to scheduling a call, appointment or meeting, chooses one of the provided time slots, or confirms a specific time for an appointment or meeting.
+call-back: The prospect request the agent to call back at another time, was busy and not able to talk at that time.
+unknown: The call ends abruptly, or the transcription is not clear or has errors making it difficult to accurately categorize the sentiment.
+dnc: he prospect is angry and explicitly mentions they never want to be called again, ask to be removed from the list and not receive any calls in the future.
 
-Analyze the transcript below and assign it the most fitting category based on the lead's responses.
-If the transcript is empty or missing, respond with N/A.
-Respond only with the appropriate category without any additional explanation.
-Transcript: ${transcript}`,
+Here is the transcript to analyze: ${transcript}
+
+Instructions:
+1. Carefully read and analyze the call transcript provided above.
+2. If the transcript is empty or missing, categorize it as 'unknown'.
+3. Based on the prospect's responses, assign the most accurate category from the list provided.
+4. Respond only with the accurate category name, without any additional explanation or justification.
+
+Output your response in the following format:
+<category>Insert category name here</category>`,
         },
       ],
       // model: "gpt-4-turbo-preview",
