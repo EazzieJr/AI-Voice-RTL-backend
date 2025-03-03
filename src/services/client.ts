@@ -2003,7 +2003,7 @@ class ClientService extends RootService {
                     .populate("referenceToCallId");
                 if (!fetch_contact) return res.status(400).json({ message: `contact ${contact} not found`});
 
-                const { referenceToCallId } = fetch_contact;
+                const { referenceToCallId, callId } = fetch_contact;
                 const { _id, transcript } = referenceToCallId;
 
                 const review = await reviewTranscript(transcript);
@@ -2014,6 +2014,13 @@ class ClientService extends RootService {
                     { 
                         userSentiment: sentiment,
                         analyzedTranscript: sentiment
+                    }
+                );
+
+                await callHistoryModel.updateOne(
+                    { callId },
+                    {
+                        userSentiment: sentiment
                     }
                 );
 
