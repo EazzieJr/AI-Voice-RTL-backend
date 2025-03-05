@@ -12,3 +12,7 @@ export const ScheduleCallSchema = Joi.object({
 export const CancelScheduleSchema = Joi.object({
     jobId: Joi.string().required()
 });
+
+export const CorrectContacts = Joi.object({
+    clientId: Joi.string().hex().length(24)
+});

@@ -241,7 +241,7 @@ export const scheduleCronJob = async (
                         // });
                     };
 
-                    await new Promise((resolve) => setTimeout(resolve, 4000));
+                    await new Promise((resolve) => setTimeout(resolve, 3000));
                 };
 
                 const update_status_to_called = await jobModel.updateOne(

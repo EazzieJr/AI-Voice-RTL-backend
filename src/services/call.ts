@@ -13,6 +13,8 @@ import moment from "moment-timezone";
 import { scheduleCronJob } from "../utils/scheduleJob";
 import schedule from "node-schedule";
 import { DateTime } from "luxon";
+import Retell from "retell-sdk";
+import { userModel } from "../models/userModel";
 
 class CallService extends RootService {
 
@@ -465,85 +467,6 @@ class CallService extends RootService {
                 console.error("Event must be call_ended", event);
             };
 
-            // let analyzedTranscriptForSentiment;
-            // let sentimentStatus;
-
-            // analyzedTranscriptForSentiment = await reviewTranscript(data.transcript);
-
-            // const is_scheduled = analyzedTranscriptForSentiment.message.content === "scheduled";
-            // const is_dnc = analyzedTranscriptForSentiment.message.content === "dnc";
-            // const is_callback = analyzedTranscriptForSentiment.message.content === "call-back";
-            // const is_neutral = data.call_analysis.user_sentiment === "Neutral";
-            // const is_unknown = data.call_analysis.user_sentiment === "Unknown";
-            // const is_positive = data.call_analysis.user_sentiment === "Positive";
-            // const is_negative = data.call_analysis.user_sentiment === "Negative";
-
-            // let addressStat;
-            // if (call.agent_id === "") {
-            //     addressStat = data.call_analysis.address;
-            // };
-            
-            // if (is_scheduled) {
-            //     sentimentStatus = callSentimentenum.SCHEDULED;
-            // } else if (is_callback) {
-            //     sentimentStatus = callSentimentenum.CALLBACK;
-            // } else if (is_dnc) {
-            //     sentimentStatus = callSentimentenum.DNC;
-            // } else if (is_neutral) {
-            //     sentimentStatus = callSentimentenum.NEUTRAL;
-            // } else if (is_positive) {
-            //     sentimentStatus = callSentimentenum.POSITIVE;
-            // } else if (is_negative) {
-            //     sentimentStatus = callSentimentenum.NEGATIVE;
-            // } else if (is_unknown) {
-            //     sentimentStatus = callSentimentenum.UNKNOWN;
-            // };
-
-            // const event_data_to_update = {
-            //     retellCallSummary: data.call_analysis.call_summary,
-            //     analyzedTranscript: sentimentStatus,
-            //     userSentiment: sentimentStatus
-            // };
-
-            // const results = await EventModel.findOneAndUpdate(
-            //     { callId: call.call_id, agentId: call.agent_id },
-            //     { $set: data },
-            //     { returnOriginal: false }
-            // );
-
-            // const data2 = {
-            //     callSummary: data.call_analysis.call_summary,
-            //     userSentiment: sentimentStatus,
-            // };
-
-            // await callHistoryModel.findOneAndUpdate(
-            //     { callId: call.call_id, agentId: call.agent_id },
-            //     { $set: data2 },
-            //     { returnOriginal: false },
-            // );
-
-            // try {
-            //     // const result = await contactModel.findOne({
-            //     //     callId: call.call_id,
-            //     //     agent: call.agent_id
-            //     // });
-
-            //     if (data.call_analysis.call_successful === false && analyzedTranscriptForSentiment.message.content === "interested") {
-            //         const result = await axios.post(process.env.MAKE_URL, {
-            //             firstname: data.retell_llm_dynamic_variables.user_firstname,
-            //             lastname: data.retell_llm_dynamic_variables.user_lastname,
-            //             email: data.retell_llm_dynamic_variables.user_email,
-            //             phone: call.to_number,
-            //             summary: data.call_analysis.call_summary,
-            //             url: data?.recording_url || null,
-            //             transcript: data.transcript,
-            //           });
-            //     }
-            // } catch (e) {
-            //     console.error("error with axios result: ", + e);
-            //     next(e);
-            // };
-
         } catch (e) {
             console.error("Error fetching data after call analyzed: ", + e);
             next(e);
@@ -613,6 +536,123 @@ class CallService extends RootService {
 
         } catch(e) {
             console.error("Error cancelling schedule" + e);
+            next(e);
+        };
+    };
+
+    async getAffectedContacts(tags: string[]) {
+        return contactModel.find({
+            dial_status: "not-called",
+            callId: {
+                $exists: true
+            },
+            tag: {
+                $in: tags
+            },
+            isDeleted: false
+        }, { callId: 1 }).lean();
+    };
+
+    async fetchCallDetails(callId: string) {
+        try {
+            const retell_client = new Retell({
+                apiKey: process.env.RETELL_API_KEY
+            });
+
+            const get_call = await retell_client.call.retrieve(callId);
+            return get_call;
+        } catch (e) {
+            console.error("Error fetching details for id: ", e);
+        };
+    };
+
+    async resetJobStats(jobIds: string[]) {
+        await DailyStatsModel.updateMany(
+            { jobProcessedBy: { $in: jobIds } },
+            {
+                $set: {
+                    totalCalls: 0,
+                    totalCallAnswered: 0,
+                    totalCallDuration: 0,
+                    totalCallInactivity: 0,
+                    totalTransffered: 0,
+                    totalFailed: 0,
+                    totalAppointment: 0,
+                    totalAnsweredByIVR: 0,
+                    totalAnsweredByVm: 0,
+                    totalDialNoAnswer: 0
+                }
+            }
+        );
+
+        console.log(`reset stats for ${jobIds.length} jobIds`);
+    };
+
+    async correct_contacts(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.query.clientId as string;
+
+            const check_client = await userModel.findById(clientId);
+
+            if (!check_client) return res.status(500).json({ message: "clientId not found" });
+
+            const { agents } = check_client;
+            const agent = agents[0];
+
+            const tags = agent.tag;
+            tags.pop();
+
+            const fetch_contacts = await this.getAffectedContacts(tags);
+            console.log("fetch: ", fetch_contacts.length);
+
+            const jobIdsToReset = new Set();
+            const bulkUpdates = [];
+
+            for (const contact of fetch_contacts) {
+                const callData = await this.fetchCallDetails(contact.callId as string);
+
+                if (!callData) continue;
+
+                const { disconnection_reason, transcript, retell_llm_dynamic_variables, recording_url, call_status, start_timestamp, end_timestamp, transcript_object, transcript_with_tool_calls, public_log_url, call_type } = callData;
+
+
+                jobIdsToReset.add(retell_llm_dynamic_variables.job_id);
+            };
+
+            console.log("joIds: ", jobIdsToReset);
+
+            // const retell_client = new Retell({
+            //     apiKey: process.env.RETELL_API_KEY
+            // });
+
+            // const fetch_contacts = await contactModel.find({
+            //     dial_status: "not-called",
+            //     callId: {
+            //         $exists: true
+            //     },
+            //     tag: {
+            //         $in: tags
+            //     },
+            //     isDeleted: false
+            // }).limit(2000);
+
+            // const call_ids = fetch_contacts.map((call: any) => call.callId);
+
+            // call_ids.forEach(async(call_id) => {
+            //     try {
+            //         console.log("here: ", call_id);
+            //         const get_call = await retell_client.call.retrieve(call_id);
+
+            //         const { disconnection_reason, transcript, retell_llm_dynamic_variables, recording_url, call_status, start_timestamp, end_timestamp, transcript_object, transcript_with_tool_calls, public_log_url, call_type } = get_call;
+
+            //         console.log("call: ", get_call);
+            //     } catch (e) {
+            //         console.error("could not fetch and update data for callId: ", call_id);
+            //     };
+            // })
+
+        } catch (e) {
+            console.error("Error correcting contacts: " + e);
             next(e);
         };
     };

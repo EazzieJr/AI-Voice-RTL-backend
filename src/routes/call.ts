@@ -17,4 +17,8 @@ router
         call_service.cancel_schedule(req, res, next);
     })
 
+    .post("/correct-contacts", (req: AuthRequest, res: Response, next: NextFunction) => {
+        call_service.correct_contacts(req, res, next);
+    })
+
 export default router;
