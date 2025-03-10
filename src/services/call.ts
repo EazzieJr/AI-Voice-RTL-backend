@@ -15,6 +15,7 @@ import schedule from "node-schedule";
 import { DateTime } from "luxon";
 import Retell from "retell-sdk";
 import { userModel } from "../models/userModel";
+import { limits } from "argon2";
 
 class CallService extends RootService {
 
@@ -540,8 +541,21 @@ class CallService extends RootService {
         };
     };
 
-    async getAffectedContacts(tags: string[]) {
-        return contactModel.find({
+    // async getAffectedContacts(tags: string[]) {
+    //     return contactModel.find({
+    //         dial_status: "not-called",
+    //         callId: {
+    //             $exists: true
+    //         },
+    //         tag: {
+    //             $in: tags
+    //         },
+    //         isDeleted: false
+    //     }, { callId: 1 }).lean().limit(1000);
+    // };
+
+    async getAffectedContacts(tags: string[], page: number) {
+        const callIds = await contactModel.find({
             dial_status: "not-called",
             callId: {
                 $exists: true
@@ -551,6 +565,19 @@ class CallService extends RootService {
             },
             isDeleted: false
         }, { callId: 1 }).lean();
+
+        const limit = 1000;
+
+        const totalRecords = callIds.length;
+        const totalPages = Math.ceil(totalRecords / limit);
+        const startIndex = (page - 1) * limit;
+
+        console.log("records: ", totalRecords);
+        console.log("pages: ", totalPages);
+
+        const result = callIds.slice(startIndex, startIndex + limit);
+
+        return result;
     };
 
     async fetchCallDetails(callId: string) {
@@ -599,57 +626,112 @@ class CallService extends RootService {
             const { agents } = check_client;
             const agent = agents[0];
 
-            const tags = agent.tag;
-            tags.pop();
+            // const tags = agent.tag;
+            // tags.pop();
+            const tags = [
+                "insider-test-calls-7",
+                "dme-first-200",
+                "dme-second-200",
+                "dme-reengagement-7138"
+            ];
 
-            const fetch_contacts = await this.getAffectedContacts(tags);
+            const fetch_contacts = await this.getAffectedContacts(tags, 1);
             console.log("fetch: ", fetch_contacts.length);
 
-            const jobIdsToReset = new Set();
-            const bulkUpdates = [];
+            function convertMsToHourMinSec(ms: number): string {
+                const totalSeconds = Math.floor(ms / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+
+                return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+            };
+
+            // const jobIdsToReset = new Set();
+            // const bulkUpdates = [];
+            const calls = [];
 
             for (const contact of fetch_contacts) {
                 const callData = await this.fetchCallDetails(contact.callId as string);
 
                 if (!callData) continue;
 
-                const { disconnection_reason, transcript, retell_llm_dynamic_variables, recording_url, call_status, start_timestamp, end_timestamp, transcript_object, transcript_with_tool_calls, public_log_url, call_type } = callData;
+                const { call_id, disconnection_reason, transcript, retell_llm_dynamic_variables, recording_url, call_status, start_timestamp, end_timestamp, transcript_object, transcript_with_tool_calls, public_log_url, call_type, call_analysis } = callData;
 
+                const duration_ms = (callData as any).duration_ms;
 
-                jobIdsToReset.add(retell_llm_dynamic_variables.job_id);
+                const call_failed = disconnection_reason === "dial_failed";
+                const call_transferred = disconnection_reason === "call_transfer";
+                const dial_no_answer = disconnection_reason === "dial_no_answer";
+                const call_inactivity = disconnection_reason === 'inactivity';
+                const call_hangedup = disconnection_reason === "user_hangup" || disconnection_reason === "agent_hangup";
+                const is_machine = disconnection_reason === "voicemail_reached";
+
+                const analyzedTranscript = await reviewTranscript(transcript);
+
+                const is_call_scheduled = analyzedTranscript.message.content === "scheduled";
+                // const is_machine = analyzedTranscript.message.content === "voicemail";
+                const is_ivr = analyzedTranscript.message.content === "ivr";
+
+                calls.push(callData);
+
+                console.log("call: ", callData);
+
+                let callStatus;
+                let statsUpdate: any = { $inc: {} };
+
+                statsUpdate.$inc.totalCalls = 1;
+                statsUpdate.$inc.totalCallDuration = duration_ms;
+
+                if (is_machine) {
+                    statsUpdate.$inc.totalAnsweredByVm = 1;
+                    callStatus = callstatusenum.VOICEMAIL;
+                } else if (is_ivr) {
+                    statsUpdate.$inc.totalAnsweredByIVR = 1;
+                    callStatus = callstatusenum.IVR;
+                } else if (is_call_scheduled) {
+                    statsUpdate.$inc.totalAppointment = 1;
+                    callStatus = callstatusenum.SCHEDULED;
+                } else if (call_failed) {
+                    statsUpdate.$inc.totalFailed = 1;
+                    callStatus = callstatusenum.FAILED;
+                } else if (call_transferred) {
+                    statsUpdate.$inc.totalTransffered = 1;
+                    callStatus = callstatusenum.TRANSFERRED;
+                } else if (dial_no_answer) {
+                    statsUpdate.$inc.totalDialNoAnswer = 1;
+                    callStatus = callstatusenum.NO_ANSWER;
+                } else if (call_inactivity) {
+                    statsUpdate.$inc.totalCallInactivity = 1;
+                    callStatus = callstatusenum.INACTIVITY;
+                } else if (call_hangedup) {
+                    statsUpdate.$inc.totalCallAnswered = 1;
+                    callStatus = callstatusenum.CALLED;
+                };
+
+                const duration_in_HMS = convertMsToHourMinSec(duration_ms);
+                const total_duration = convertMsToHourMinSec(end_timestamp - start_timestamp || 0);
+
+                await EventModel.findOneAndUpdate(
+                    { callId: call_id },
+                    {
+                        transcript,
+                        recordingUrl: recording_url,
+                        retellCallSummary: call_analysis.call_summary,
+                        userSentiment: callStatus,
+                        disconnectionReason: disconnection_reason,
+                        analyzedTranscript: callStatus,
+                        callDuration: duration_in_HMS,
+                        retellCallStatus: call_status,
+                        // duration: to
+                    }
+                )
+
+                // jobIdsToReset.add(retell_llm_dynamic_variables.job_id);
             };
 
-            console.log("joIds: ", jobIdsToReset);
-
-            // const retell_client = new Retell({
-            //     apiKey: process.env.RETELL_API_KEY
-            // });
-
-            // const fetch_contacts = await contactModel.find({
-            //     dial_status: "not-called",
-            //     callId: {
-            //         $exists: true
-            //     },
-            //     tag: {
-            //         $in: tags
-            //     },
-            //     isDeleted: false
-            // }).limit(2000);
-
-            // const call_ids = fetch_contacts.map((call: any) => call.callId);
-
-            // call_ids.forEach(async(call_id) => {
-            //     try {
-            //         console.log("here: ", call_id);
-            //         const get_call = await retell_client.call.retrieve(call_id);
-
-            //         const { disconnection_reason, transcript, retell_llm_dynamic_variables, recording_url, call_status, start_timestamp, end_timestamp, transcript_object, transcript_with_tool_calls, public_log_url, call_type } = get_call;
-
-            //         console.log("call: ", get_call);
-            //     } catch (e) {
-            //         console.error("could not fetch and update data for callId: ", call_id);
-            //     };
-            // })
+            // console.log("joIds: ", jobIdsToReset);
+            console.log("finished batch: ", calls.length);
 
         } catch (e) {
             console.error("Error correcting contacts: " + e);
