@@ -142,30 +142,25 @@ class CallService extends RootService {
 
             const todayStringWithTime = `${year}-${month}-${day}`;
             const time = `${hours}: ${minutes}`;
-            try {
-                if (event === "call_started") {
-                    console.log(`call started for: ${data.call_id}`);
-                    await this.call_started(payload, res, next);
-                } else if (event === "call_ended") {
-                    console.log(`call ended: ${data.call_id}`);
-                    await this.call_ended(payload, todayString, todayStringWithTime, time, next);
-                } else if (event === "call_analyzed") {
-                    console.log(`call analyzed for: ${data.call_id}`);
-                    await this.call_analyzed(payload, next);
-                } else {
-                    res.status(500).json({ 
-                        error: "Invalid event detected",
-                        event_gotten: event
-                    });
-                    return;
-                };
-            } catch (e) {
-                console.error("Error reading event and data: " + e);
-                next(e);
+
+            if (event === "call_started") {
+                console.log(`call started for: ${data.call_id}`);
+                await this.call_started(payload, res, next);
+            } else if (event === "call_ended") {
+                console.log(`call ended: ${data.call_id}`);
+                await this.call_ended(payload, todayString, todayStringWithTime, time, next);
+            } else if (event === "call_analyzed") {
+                console.log(`call analyzed for: ${data.call_id}`);
+                await this.call_analyzed(payload, next);
+            } else {
+                return res.status(500).json({ 
+                    error: "Invalid event detected",
+                    event_gotten: event
+                });
             };
 
             console.log("pay: ", payload);
-            res.status(200).send("webhook hit");
+            return res.status(200).send("webhook hit");
 
         } catch (e) {
             console.error("Error while accessing webhook from retell: " + e);
@@ -194,7 +189,7 @@ class CallService extends RootService {
 
         } catch (e) {
             console.error("Unable to get data from started call: " + e);
-            next(e);
+            // next(e);
         };
     };
 
@@ -367,7 +362,7 @@ class CallService extends RootService {
 
         } catch (e) {
             console.error("Unable to get data from call ended: " + e);
-            next(e);
+            // next(e);
         };
     };
 
@@ -471,7 +466,7 @@ class CallService extends RootService {
 
         } catch (e) {
             console.error("Error fetching data after call analyzed: ", + e);
-            next(e);
+            // next(e);
         };
     };
 
