@@ -153,10 +153,11 @@ class CallService extends RootService {
                     console.log(`call analyzed for: ${data.call_id}`);
                     await this.call_analyzed(payload, next);
                 } else {
-                    return res.status(500).json({ 
+                    res.status(500).json({ 
                         error: "Invalid event detected",
                         event_gotten: event
                     });
+                    return;
                 };
             } catch (e) {
                 console.error("Error reading event and data: " + e);
