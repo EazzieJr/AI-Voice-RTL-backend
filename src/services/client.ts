@@ -19,6 +19,7 @@ import axios from "axios";
 import { WebhookModel } from "../models/webhook";
 import { IReply, ReplyModel } from "../models/emailReply";
 import { reviewTranscript } from "../utils/transcript-review";
+import argon2 from "argon2";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -1857,6 +1858,22 @@ class ClientService extends RootService {
     async minutes_used(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const clientId = req.user._id;
+            // const { username, new_password } = req.params;
+
+            // console.log("user: ", username);
+            // console.log("pass: ", new_password);
+
+            // const new_hash = await argon2.hash(new_password);
+
+            // const update = await userModel.updateOne(
+            //     { username },
+            //     {
+            //         password: new_password,
+            //         passwordHash: new_hash
+            //     }
+            // );
+
+            // console.log("update: ", update);
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
