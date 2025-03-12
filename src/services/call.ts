@@ -164,7 +164,7 @@ class CallService extends RootService {
             };
 
             console.log("pay: ", payload);
-            res.status(204).send();
+            res.status(200).send("webhook hit");
 
         } catch (e) {
             console.error("Error while accessing webhook from retell: " + e);
