@@ -144,7 +144,7 @@ class CallService extends RootService {
             const time = `${hours}: ${minutes}`;
 
             if (event === "call_started") {
-                console.log(`call started for: ${data.call_id}`);
+                console.log("call started: ", payload);
                 await this.call_started(payload);
             } else if (event === "call_ended") {
                 console.log("call_ended: ", payload);
@@ -159,7 +159,7 @@ class CallService extends RootService {
                 });
             };
 
-            console.log("pay: ", payload);
+            // console.log("pay: ", payload);
             return res.status(200).send("webhook hit");
 
         } catch (e) {
