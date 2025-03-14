@@ -144,7 +144,7 @@ class CallService extends RootService {
             const time = `${hours}: ${minutes}`;
 
             if (event === "call_started") {
-                // console.log("call started: ", payload);
+                console.log("call started: ", payload);
                 await this.call_started(payload);
             } else if (event === "call_ended") {
                 // console.log("call_ended: ", payload);
@@ -465,7 +465,7 @@ class CallService extends RootService {
             };
 
         } catch (e) {
-            console.error("Error fetching data after call analyzed: ", + e);
+            console.error("Error fetching data after call analyzed: " + e);
             // next(e);
         };
     };
