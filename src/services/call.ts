@@ -151,7 +151,7 @@ class CallService extends RootService {
                 await this.call_ended(payload, todayString, todayStringWithTime, time);
             } else if (event === "call_analyzed") {
                 console.log("call analyzed: ", payload);
-                await this.call_analyzed(payload, next);
+                await this.call_analyzed(payload);
             } else {
                 return res.status(500).json({ 
                     error: "Invalid event detected",
@@ -366,7 +366,7 @@ class CallService extends RootService {
         };
     };
 
-    async call_analyzed(payload: any, next: NextFunction) {
+    async call_analyzed(payload: any) {
         try {
             const { event, data, call } = payload;
             console.log("pay: ", payload);
@@ -457,7 +457,6 @@ class CallService extends RootService {
                     };
                 } catch (e) {
                     console.error("error with axios result: ", + e);
-                    next(e);
                 };
                 
             } else {
