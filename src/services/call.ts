@@ -144,13 +144,13 @@ class CallService extends RootService {
             const time = `${hours}: ${minutes}`;
 
             if (event === "call_started") {
-                console.log("call started: ", payload);
+                // console.log("call started: ", payload);
                 await this.call_started(payload);
             } else if (event === "call_ended") {
-                console.log("call_ended: ", payload);
+                // console.log("call_ended: ", payload);
                 await this.call_ended(payload, todayString, todayStringWithTime, time);
             } else if (event === "call_analyzed") {
-                console.log("call analyzed: ", payload);
+                // console.log("call analyzed: ", payload);
                 await this.call_analyzed(payload);
             } else {
                 return res.status(500).json({ 
@@ -368,6 +368,7 @@ class CallService extends RootService {
 
     async call_analyzed(payload: any) {
         try {
+            console.log("call_analyzed: ", payload);
             const { event, data, call } = payload;
             // console.log("pay: ", payload);
 
