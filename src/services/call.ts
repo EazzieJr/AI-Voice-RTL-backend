@@ -171,7 +171,7 @@ class CallService extends RootService {
     async call_started(payload: any) {
         try {
             const { event, data } = payload;
-            console.log("data: ", payload);
+            // console.log("data: ", payload);
 
             if (event === "call_started") {
                 const { call_id, agent_id } = data;
@@ -181,7 +181,7 @@ class CallService extends RootService {
                     { $set: { dial_status: callstatusenum.IN_PROGRESS } }
                 );
 
-                console.log("call started for: ", call_id);
+                // console.log("call started for: ", call_id);
 
             } else {
                 console.error("Event must be call_started: ", event);
@@ -195,7 +195,7 @@ class CallService extends RootService {
 
     async call_ended(payload: any, todayString: string, todaysDateForDatesCalled: any, time: any) {
         try {
-            console.log("payload: ", payload);
+            // console.log("payload: ", payload);
             const { event, call, data } = payload;
             const {
                 call_type,
@@ -354,7 +354,7 @@ class CallService extends RootService {
                     { $set: updateData }
                 );
 
-                console.log("call ended for: ", call_id);
+                // console.log("call ended for: ", call_id);
                 
             } else {
                 console.error("Event must be call_ended: ", event);
@@ -369,7 +369,7 @@ class CallService extends RootService {
     async call_analyzed(payload: any) {
         try {
             const { event, data, call } = payload;
-            console.log("pay: ", payload);
+            // console.log("pay: ", payload);
 
             const { transcript, call_analysis, retell_llm_dynamic_variables, recording_url } = data;
             const { agent_id, call_id, to_number } = call;
@@ -408,7 +408,7 @@ class CallService extends RootService {
                 } else if (is_unknown) {
                     sentimentStatus = callSentimentenum.UNKNOWN;
                 };
-                console.log("senti: ", sentimentStatus);
+                // console.log("senti: ", sentimentStatus);
 
                 const event_data_to_update = {
                     retellCallSummary: call_analysis.call_summary,
@@ -422,7 +422,7 @@ class CallService extends RootService {
                     { returnOriginal: false }
                 );
 
-                console.log("res: ", results);
+                // console.log("res: ", results);
 
                 const data2 = {
                     callSummary: call_analysis.call_summary,
@@ -453,7 +453,7 @@ class CallService extends RootService {
                             transcript: transcript,
                         });
 
-                        console.log("result: ", result);
+                        // console.log("result: ", result);
                     };
                 } catch (e) {
                     console.error("error with axios result: ", + e);
