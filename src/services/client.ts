@@ -203,7 +203,7 @@ class ClientService extends RootService {
                 automatedRate: `${automatedRate.toFixed(2)}%`,
                 // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
                 totalAppointment: stats[0]?.totalAppointment || 0,
-                totalCallsTransffered: stats[0]?.totalCallsTransffered || 0,
+                totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
                 totalCalls,
                 // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
                 // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
