@@ -108,7 +108,7 @@ export const scheduleCronJob = async (
                         ...(lowerCaseTag ? { tag: lowerCaseTag } : {}),
                         isOnDNCList: false,
                         isTaken: true
-                    });
+                    }).limit(limit);
                 console.log("Total contacts found: ", contacts_count);
 
                 const update_contacts_to_process = await jobModel.updateOne(
