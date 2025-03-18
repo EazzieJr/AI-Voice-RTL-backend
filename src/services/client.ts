@@ -1517,7 +1517,8 @@ class ClientService extends RootService {
                 scheduledTime: {
                     $gte: startDate,
                     $lte: endDate
-                }
+                },
+                callstatus: { $in: ["Calling", "Called"] }
             });
 
             let allContactsToProcess: number = 0;
