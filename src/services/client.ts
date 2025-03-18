@@ -1693,7 +1693,7 @@ class ClientService extends RootService {
                     client_id: id
                     // mail_read: false
                 })
-                .sort({ createdAt: -1 })
+                .sort({ event_timestamp: -1 })
                 .lean();
 
             if (replies.length < 1) return res.status(200).json({ message: "No replies yet" });
@@ -1703,7 +1703,6 @@ class ClientService extends RootService {
             const page_to_use = parseInt(page) || 1; 
             const totalRecords = replies.length;
             const totalPages = Math.ceil(totalRecords / limit);
-            const reversedReplies = replies.reverse();
 
             if (page_to_use > totalPages) {
                 return res.status(400).json({
@@ -1714,7 +1713,7 @@ class ClientService extends RootService {
             const startIndex = (page_to_use - 1) * limit;
             const endIndex = page_to_use * limit;
 
-            const result = reversedReplies.slice(startIndex, endIndex);
+            const result = replies.slice(startIndex, endIndex);
 
             return res.status(200).json({
                 success: true,
