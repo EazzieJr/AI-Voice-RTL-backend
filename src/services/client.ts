@@ -729,7 +729,7 @@ class ClientService extends RootService {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
             }
 
-            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+            if (!foundClient) return res.status(400).json({ error: "Client not found in Intuitive Campaigns" });
 
             const { id } = foundClient;
 
@@ -815,7 +815,7 @@ class ClientService extends RootService {
             });
 
         } catch (e) {
-            console.error("Error fetching message history from smartlead: " + e);
+            console.error("Error fetching message history from Intuitive Campaign: " + e);
             next(e);
         };
     };
@@ -854,7 +854,7 @@ class ClientService extends RootService {
             });
 
         } catch (e) {
-            console.error("Error forwarding reply via smartlead: " + e);
+            console.error("Error forwarding reply via Intuitive campaign: " + e);
             next(e);
         };
     };
@@ -1143,7 +1143,7 @@ class ClientService extends RootService {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
             }
 
-            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+            if (!foundClient) return res.status(400).json({ error: "Client not found in Intuitive Campaigns"});
 
             const { id } = foundClient;
 
@@ -1684,7 +1684,7 @@ class ClientService extends RootService {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
             }
 
-            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead" });
+            if (!foundClient) return res.status(400).json({ error: "Client not found in Intuitive Campaigns" });
 
             const { id } = foundClient;
 
@@ -1973,7 +1973,7 @@ class ClientService extends RootService {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
             }
 
-            if (!foundClient) return res.status(400).json({ error: "Client not found in SmartLead"});
+            if (!foundClient) return res.status(400).json({ error: "Client not found in Intuitive Campaigns"});
 
             const { id } = foundClient;
             console.log("client id: ", id);
