@@ -1650,7 +1650,7 @@ class ClientService extends RootService {
     async fetch_replies(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
         try {
             const clientId = req.user._id;
-            const page = req.query.page as string;
+            const page = parseInt(req.query.page as string) || 1;
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
@@ -1688,37 +1688,33 @@ class ClientService extends RootService {
 
             const { id } = foundClient;
 
-            const replies = await ReplyModel
-                .find({
-                    client_id: id
-                    // mail_read: false
-                })
-                .sort({ event_timestamp: -1 })
-                .lean();
-
-            if (replies.length < 1) return res.status(200).json({ message: "No replies yet" });
-
             const limit = 50;
+            const skip = (page - 1) * limit;
 
-            const page_to_use = parseInt(page) || 1; 
-            const totalRecords = replies.length;
+            const totalRecords = await ReplyModel.countDocuments({ client_id: id });
             const totalPages = Math.ceil(totalRecords / limit);
 
-            if (page_to_use > totalPages) {
+            if (page > totalPages) {
                 return res.status(400).json({
                     error: "Page exceeds available data"
-                })
+                });
             };
 
-            const startIndex = (page_to_use - 1) * limit;
-            const endIndex = page_to_use * limit;
+            const replies = await ReplyModel
+                .find({ client_id: id })
+                .sort({ event_timestamp: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean();
 
-            const result = replies.slice(startIndex, endIndex);
+            if (replies.length < 1) {
+                return res.status(200).json({ message: "No replies yet" });
+            };
 
             return res.status(200).json({
                 success: true,
-                result,
-                page: page_to_use,
+                result: replies,
+                page,
                 totalPages,
                 totalRecords
             });
