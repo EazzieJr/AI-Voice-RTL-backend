@@ -1694,6 +1694,10 @@ class ClientService extends RootService {
             const totalRecords = await ReplyModel.countDocuments({ client_id: id });
             const totalPages = Math.ceil(totalRecords / limit);
 
+            if (totalRecords < 1) {
+                return res.status(200).json({ message: "No replies yet" });
+            };
+
             if (page > totalPages) {
                 return res.status(400).json({
                     error: "Page exceeds available data"
@@ -1706,10 +1710,6 @@ class ClientService extends RootService {
                 .skip(skip)
                 .limit(limit)
                 .lean();
-
-            if (replies.length < 1) {
-                return res.status(200).json({ message: "No replies yet" });
-            };
 
             return res.status(200).json({
                 success: true,
@@ -1856,7 +1856,8 @@ class ClientService extends RootService {
     async minutes_used(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const clientId = req.user._id;
-            // const { username, new_password } = req.params;
+            // const username = req.query.username as string;
+            // const new_password = req.query.new_password as string;
 
             // console.log("user: ", username);
             // console.log("pass: ", new_password);
