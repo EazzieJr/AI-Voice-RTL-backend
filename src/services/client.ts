@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { callstatusenum, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -2051,6 +2051,84 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error correcting sentiment: " + e);
+            next(e);
+        };
+    };
+
+    async edit_profile(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = EditProfileSchema.validate(body, { abortEarly: false } );
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const { username, password, email, group, name, agent } = body;
+            let data_to_update = {};
+
+            if (password) {
+                const new_hash = await argon2.hash(password);
+
+                data_to_update = {
+                    password,
+                    passwordHash: new_hash
+                };
+            };
+
+            if (agent) {
+                // const existingAgentIndex = check_user.agents.findIndex((a: any) => a.agentId === agent.agentId);
+
+                // if (existingAgentIndex !== -1) {
+                //     check_user.agents[existingAgentIndex] = agent;
+                // } else {
+                //     check_user.agents.push(agent);
+                // }
+
+                data_to_update = {
+                    ...data_to_update,
+                    "agents.0.agentId": agent
+                };
+            };
+
+            if (email) {
+                const check_email = await userModel.findOne({ email });
+                if (check_email) return res.status(400).json({ error: "Email already exists for another user" });
+
+                data_to_update = {
+                    ...data_to_update,
+                    email
+                };
+            };
+
+            const fieldsToUpdate = { username, group, name };
+            for (const [key, value] of Object.entries(fieldsToUpdate)) {
+                if (value !== undefined && value !== null && value !== '') {
+                    data_to_update = {
+                        ...data_to_update,
+                        [key]: value
+                    };
+                }
+            };
+
+            const updatedUser = await userModel.updateOne(
+                { _id: clientId },
+                { $set: data_to_update }
+            );
+
+            if (!updatedUser.acknowledged) {
+                return res.status(400).json({ message: "Unable to update profile" });
+            };
+
+            return res.status(200).json({
+                success: true,
+                message: "Profile updated successfully"
+            });
+
+        } catch (e) {
+            console.error("Error editing profile: " + e);
             next(e);
         };
     };

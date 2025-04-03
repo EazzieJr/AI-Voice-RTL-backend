@@ -63,4 +63,6 @@ router
 
     .post("/sentiment-transcript", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.sentiment_correction_script(req, res, next))
 
+    .put("/edit-profile", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.edit_profile(req, res, next))
+
 export default router; 
