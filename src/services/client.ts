@@ -20,6 +20,8 @@ import { WebhookModel } from "../models/webhook";
 import { IReply, ReplyModel } from "../models/emailReply";
 import { reviewTranscript } from "../utils/transcript-review";
 import argon2 from "argon2";
+import { cloudinary } from "../utils/upload";
+import streamifier from "streamifier";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -2132,6 +2134,61 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
+    async upload_svg(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+            const file = req.file as Express.Multer.File;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+            const uploadImageHandler = () => {
+                return new Promise((resolve, reject) => {
+                    const svgImageResult = cloudinary.v2.uploader.upload_stream(
+                        { 
+                            resource_type: "raw", 
+                            folder: `Profile_Pictures`,     
+                        }, 
+                        (error, data) => {
+                            if (error) {
+                                reject(error);
+                            } else {
+                                resolve(data);
+                                return data; 
+                            }
+                        });
+
+                    streamifier.createReadStream(file.buffer).pipe(svgImageResult);
+                });
+            };
+
+            const svgResult = await uploadImageHandler() as any;
+
+            const svgUrl = svgResult.secure_url;
+
+            const update = await userModel.updateOne(
+                { _id: clientId },
+                {
+                    svgUrl: svgUrl
+                }
+            );
+
+            if (!update.acknowledged) return res.status(400).json({ message: "Unable to upload SVG" });
+
+            return res.status(200).json({
+                success: true,
+                message: "SVG uploaded successfully",
+                svgUrl
+            });
+            
+        } catch (e) {
+            console.error("Error uploading SVG: " + e);
+            next(e);
+        };
+    }
 };
 
 export const client_service = new ClientService();

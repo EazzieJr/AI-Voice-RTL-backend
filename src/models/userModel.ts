@@ -20,6 +20,7 @@ const loginSchema = new Schema({
     type: Boolean,
   },
 });
+
 const userSchema = new Schema(
   {
     email: {
@@ -50,13 +51,17 @@ const userSchema = new Schema(
       type: String,
     },
     loginDetails: [loginSchema],
-
+    svgUrl: {
+      type: String
+    }
   },
   {
     timestamps: true,
   },
 );
+
 userSchema.pre("save", async function () {
   this.passwordHash = await argon2.hash(this.password);
 });
+
 export const userModel = model("User", userSchema);

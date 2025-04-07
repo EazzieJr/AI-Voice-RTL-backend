@@ -4,6 +4,7 @@ import { client_service } from "../services/client";
 import { AuthRequest } from "../middleware/authRequest";
 import AuthMiddleware from "../middleware/auth";
 import { upload } from "../middleware/multerConfig";
+import { upload as load } from "../utils/upload";
 
 const authenticate = AuthMiddleware.authenticate;
 
@@ -57,12 +58,16 @@ router
 
     .get("/minutes-used", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.minutes_used(req, res, next))
 
-    // .get("/minutes-used/:username/:new_password", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.minutes_used(req, res, next))
-
     .get("/trigger-lead-calls", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.trigger_lead_calls(req, res, next))
 
     .post("/sentiment-transcript", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.sentiment_correction_script(req, res, next))
 
     .put("/edit-profile", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.edit_profile(req, res, next))
+
+    .put(
+        "/upload-svg", 
+        authenticate,
+        load.single("svgFile"),
+        (req: AuthRequest, res: Response, next: NextFunction) => client_service.upload_svg(req, res, next))
 
 export default router; 
