@@ -1697,7 +1697,7 @@ class ClientService extends RootService {
             const totalPages = Math.ceil(totalRecords / limit);
 
             if (totalRecords < 1) {
-                return res.status(200).json({ message: "No replies yet" });
+                return res.status(200).json({ result: [] });
             };
 
             if (page > totalPages) {
