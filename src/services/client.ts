@@ -1653,6 +1653,7 @@ class ClientService extends RootService {
         try {
             const clientId = req.user._id;
             const page = parseInt(req.query.page as string) || 1;
+            const campaign_id = req.query.campaignId as string;
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
@@ -1665,6 +1666,7 @@ class ClientService extends RootService {
             const clients_data = clients.data;
 
             let foundClient;
+            let query: { [key: string]: any } = {};
 
             interface ClientObject {
                 id: number,
@@ -1680,8 +1682,6 @@ class ClientService extends RootService {
             
             if (name === "Legacy Alliance Club") {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
-            } else if (name === "Cory Lopez-Warfield") {
-                foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
             } else {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
             }
@@ -1693,7 +1693,12 @@ class ClientService extends RootService {
             const limit = 50;
             const skip = (page - 1) * limit;
 
-            const totalRecords = await ReplyModel.countDocuments({ client_id: id });
+            query.client_id = id;
+            if (campaign_id) {
+                query.campaign_id = campaign_id;
+            };
+
+            const totalRecords = await ReplyModel.countDocuments(query);
             const totalPages = Math.ceil(totalRecords / limit);
 
             if (totalRecords < 1) {
@@ -1707,7 +1712,7 @@ class ClientService extends RootService {
             };
 
             const replies = await ReplyModel
-                .find({ client_id: id })
+                .find(query)
                 .sort({ event_timestamp: -1 })
                 .skip(skip)
                 .limit(limit)
