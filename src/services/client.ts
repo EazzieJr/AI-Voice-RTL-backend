@@ -267,6 +267,7 @@ class ClientService extends RootService {
             const callHistories = await Promise.all(callHistory.map(async (history) => {
                 const lead = await contactModel.findOne({ callId: history.callId }).lean();
                 const calledTimes = lead?.calledTimes || 0;
+                const lastCalled = lead?.datesCalled[0] || "";
 
                 return {
                     callId: history.callId || "",
@@ -284,8 +285,10 @@ class ClientService extends RootService {
                     summary: history.callSummary || "",
                     recording: history.recordingUrl || "",
                     address: history.address || "",
-                    calledTimes: calledTimes || 0 // Add the calledTimes field
+                    callAttempts: calledTimes || 0, // Add the calledTimes field
+                    lastCalled
                 };
+
             }));
 
             console.log("hist: ", callHistories);
