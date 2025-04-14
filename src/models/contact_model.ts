@@ -84,7 +84,28 @@ const ContactSchema = new Schema<IContact>(
       type:Number
     },
     address: { type: String },
-    isTaken:{type:Boolean, default: false}
+    isTaken:{type:Boolean, default: false},
+    city: {
+      type: String
+    },
+    state: {
+      type: String
+    },
+    zipCode: {
+      type: String
+    },
+    sid: {
+      type: String
+    },
+    oid: {
+      type: String
+    },
+    employmentStatus: {
+      type: String
+    },
+    creditEstimate: {
+      type: String
+    }
   },
   { timestamps: true },
 );

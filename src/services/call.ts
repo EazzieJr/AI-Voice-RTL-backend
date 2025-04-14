@@ -495,6 +495,8 @@ class CallService extends RootService {
                 transcript_with_tool_calls 
             } = call;
 
+            const fetch_client = await userModel.findOne({ 'agents.agentId': agent_id });
+
             let analyzedTranscriptForStatus;
             let callStatus;
             let sentimentStatus;
@@ -554,6 +556,9 @@ class CallService extends RootService {
                 } else if (call_transferred) {
                     statsUpdate.$inc.totalTransffered = 1;
                     callStatus = callstatusenum.TRANSFERRED;
+                    if (fetch_client.name === "New Funding Solutions") {
+                        await this.call_webhook(call_id);
+                    }
                 } else if (dial_no_answer) {
                     statsUpdate.$inc.totalDialNoAnswer = 1;
                     callStatus = callstatusenum.NO_ANSWER;
@@ -567,6 +572,9 @@ class CallService extends RootService {
 
                 if (is_call_scheduled) {
                     sentimentStatus = callSentimentenum.SCHEDULED;
+                    if (fetch_client.name === "New Funding Solutions") {
+                        await this.call_webhook(call_id);
+                    };
                 } else if (is_callback) {
                     sentimentStatus = callSentimentenum.CALLBACK;
                 } else if (is_dnc) {
@@ -938,6 +946,45 @@ class CallService extends RootService {
         } catch (e) {
             console.error("Error correcting contacts: " + e);
             next(e);
+        };
+    };
+
+    async call_webhook(callId: string) {
+        try {
+            const fetch_details = await contactModel.findOne({ callId });
+            if (!fetch_details) return console.error("No details found for callId: ", callId);
+            
+            const { firstname, lastname, address, city, state, zipCode, phone, sid, oid, referenceToCallId, employmentStatus, creditEstimate } = fetch_details;
+
+            const fetch_transcript = await EventModel.findById(referenceToCallId);
+            if (!fetch_transcript) return console.error("No transcript found for callId: ", callId);
+
+            const recordingUrl = fetch_transcript.recordingUrl;
+
+            const body_to_send = {
+                pFname: firstname,
+                pLname: lastname,
+                pAddress: address,
+                pCity: city,
+                pState: state,
+                pZipCode: zipCode,
+                pHomePhone: phone,
+                pSID: sid,
+                pOID: oid,
+                pRecordingUrl: recordingUrl,
+                pEmploymentStatus: employmentStatus,
+                pCreditEstimate: creditEstimate,
+            };
+
+            const response = await axios.post(`https://hook.us1.make.com/ctp3cls3ctgbx1p252wfmmojcsxhpeso`, body_to_send);
+            const result = response.data;
+
+            console.log("make result: ", result);
+
+            return result;
+
+        } catch (e) {
+            console.error("Error with call webhook: " + e);
         };
     };
 };

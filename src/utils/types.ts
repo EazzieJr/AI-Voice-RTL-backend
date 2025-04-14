@@ -38,7 +38,14 @@ export interface IContact {
   timesCalled?: string
   address:string
   calledTimes?: number
-  isTaken?: boolean
+  isTaken?: boolean,
+  city?: string,
+  state?: string,
+  zipCode?: string,
+  sid?: string,
+  oid?: string,
+  employmentStatus?: string,
+  creditEstimate?: string
 }
 
 export enum DaysToBeProcessedEnum{
