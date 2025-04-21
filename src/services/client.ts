@@ -292,27 +292,6 @@ class ClientService extends RootService {
             }));
 
             console.log("hist: ", callHistories);
-            return res.status(200).json({
-                success: true,
-                callHistories
-            });
-            // const callHistories = callHistory.map((history) => ({
-            //     callId: history.callId || "",
-            //     firstName: history.userFirstname || "",
-            //     lastName: history.userLastname || "",
-            //     email: history.userEmail || "",
-            //     phone: history.toNumber || "",
-            //     agentId: history.agentId || "",
-            //     duration: history.durationMs || "",
-            //     status: history.callStatus || "",
-            //     dial_status: history.dial_status || "",
-            //     transcript: history.transcript || "",
-            //     sentiment: history.userSentiment || "",
-            //     timestamp: history.endTimestamp || "",
-            //     summary: history.callSummary || "",
-            //     recording: history.recordingUrl || "",
-            //     address: history.address || ""
-            // }));
 
             const totalRecords = await callHistoryModel.countDocuments(query);
             const totalPages = Math.ceil(totalRecords / pageSize);

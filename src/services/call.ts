@@ -954,7 +954,7 @@ class CallService extends RootService {
             const fetch_details = await contactModel.findOne({ callId });
             if (!fetch_details) return console.error("No details found for callId: ", callId);
             
-            const { firstname, lastname, address, city, state, zipCode, phone, sid, oid, referenceToCallId, employmentStatus, creditEstimate } = fetch_details;
+            const { firstname, lastname, address, city, state, zipCode, phone, sid, oid, referenceToCallId, employmentStatus, creditEstimate, email } = fetch_details;
 
             const fetch_transcript = await EventModel.findById(referenceToCallId);
             if (!fetch_transcript) return console.error("No transcript found for callId: ", callId);
@@ -974,6 +974,7 @@ class CallService extends RootService {
                 pRecordingUrl: recordingUrl,
                 pEmploymentStatus: employmentStatus,
                 pCreditEstimate: creditEstimate,
+                pEmail: email
             };
 
             const response = await axios.post(`https://hook.us1.make.com/ctp3cls3ctgbx1p252wfmmojcsxhpeso`, body_to_send);

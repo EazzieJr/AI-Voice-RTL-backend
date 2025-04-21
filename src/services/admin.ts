@@ -140,8 +140,10 @@ class AdminService extends RootService {
                     }
                 ]);
 
+                console.log("result: ", result);
+
                 if (result[0].results.length === 0) {
-                    return res.status(200).json({ message: "No data found for your search params"});
+                    return res.status(200).json({ result: [], message: "No data found for your search params"});
                 };
 
                 totalRecords = result[0].totalRecords[0].count;
