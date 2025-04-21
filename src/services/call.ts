@@ -956,7 +956,7 @@ class CallService extends RootService {
             
             const { firstname, lastname, address, city, state, zipCode, phone, sid, oid, referenceToCallId, employmentStatus, creditEstimate, email } = fetch_details;
 
-            const fetch_transcript = await EventModel.findById(referenceToCallId);
+            const fetch_transcript = await EventModel.findOne({ callId});
             if (!fetch_transcript) return console.error("No transcript found for callId: ", callId);
 
             const recordingUrl = fetch_transcript.recordingUrl;
