@@ -951,13 +951,15 @@ class CallService extends RootService {
 
     async call_webhook(callId: string) {
         try {
+            console.log("in here with callId: ", callId);
             const fetch_details = await contactModel.findOne({ callId });
             if (!fetch_details) return console.error("No details found for callId: ", callId);
-            
+            console.log("retell details: ", fetch_details);
             const { firstname, lastname, address, city, state, zipCode, phone, sid, oid, referenceToCallId, employmentStatus, creditEstimate, email } = fetch_details;
 
-            const fetch_transcript = await EventModel.findOne({ callId});
-            if (!fetch_transcript) return console.error("No transcript found for callId: ", callId);
+            const fetch_transcript = await EventModel.findOne({ callId });
+            console.log("transcript details: ", fetch_transcript);
+            // if (!fetch_transcript) return console.error("No transcript found for callId: ", callId);
 
             const recordingUrl = fetch_transcript.recordingUrl;
 
