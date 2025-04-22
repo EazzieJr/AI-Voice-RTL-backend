@@ -2,7 +2,7 @@ import RootService from "./_root";
 import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/authRequest";
 import { format, toZonedTime } from "date-fns-tz";
-import { callstatusenum, DateOption } from "../utils/types";
+import { callstatusenum, Category, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
 import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema } from "../validations/client";
@@ -1665,6 +1665,7 @@ class ClientService extends RootService {
             const clientId = req.user._id;
             const page = parseInt(req.query.page as string) || 1;
             const campaign_id = req.query.campaignId as string;
+            const category = req.query.category as string;
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
@@ -1707,6 +1708,32 @@ class ClientService extends RootService {
             query.client_id = id;
             if (campaign_id) {
                 query.campaign_id = campaign_id;
+            };
+
+            if (category) {
+                switch (category) {
+                    case (Category.INTERESTED):
+                        query.reply_category = 1;
+                        break;
+                    case (Category.SCHEDULED):
+                        query.reply_category = 2;
+                        break;
+                    case (Category.UNINTERESTED):
+                        query.reply_category = 3;
+                        break;
+                    case (Category.DNC):
+                        query.reply_category = 4;
+                        break;
+                    case (Category.INFORMATION):
+                        query.reply_category = 5;
+                        break;
+                    case (Category.OOF):
+                        query.reply_category = 6;
+                        break;
+                    case (Category.WRONG):
+                        query.reply_category = 7;
+                        break;                    
+                };
             };
 
             const totalRecords = await ReplyModel.countDocuments(query);

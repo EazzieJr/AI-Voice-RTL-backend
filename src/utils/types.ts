@@ -240,3 +240,13 @@ export enum DateOption {
   Total = 'total',
   LAST_SCHEDULE = "last-schedule"
 }
+
+export enum Category {
+  UNINTERESTED = "not_interested",
+  INTERESTED = "interested",
+  SCHEDULED = "meeting_request",
+  WRONG = "wrong_person",
+  OOF = "out_of_office",
+  INFORMATION = "information_request",
+  DNC = "do_not_contact"
+};
