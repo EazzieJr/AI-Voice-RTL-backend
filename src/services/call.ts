@@ -961,7 +961,7 @@ class CallService extends RootService {
             console.log("transcript details: ", fetch_transcript);
             // if (!fetch_transcript) return console.error("No transcript found for callId: ", callId);
 
-            const recordingUrl = fetch_transcript.recordingUrl;
+            const recordingUrl = fetch_transcript?.recordingUrl || "";
 
             const body_to_send = {
                 pFname: firstname,
@@ -978,6 +978,7 @@ class CallService extends RootService {
                 pCreditEstimate: creditEstimate,
                 pEmail: email
             };
+            console.log("body_to_send: ", body_to_send);
 
             const response = await axios.post(`https://hook.us1.make.com/ctp3cls3ctgbx1p252wfmmojcsxhpeso`, body_to_send);
             const result = response.data;
