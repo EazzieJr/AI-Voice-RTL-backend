@@ -556,9 +556,9 @@ class CallService extends RootService {
                 } else if (call_transferred) {
                     statsUpdate.$inc.totalTransffered = 1;
                     callStatus = callstatusenum.TRANSFERRED;
-                    if (fetch_client.name === "New Funding Solutions") {
-                        await this.call_webhook(call_id);
-                    }
+                    // if (fetch_client.name === "New Funding Solutions") {
+                    //     await this.call_webhook(call_id);
+                    // }
                 } else if (dial_no_answer) {
                     statsUpdate.$inc.totalDialNoAnswer = 1;
                     callStatus = callstatusenum.NO_ANSWER;
@@ -572,9 +572,9 @@ class CallService extends RootService {
 
                 if (is_call_scheduled) {
                     sentimentStatus = callSentimentenum.SCHEDULED;
-                    if (fetch_client.name === "New Funding Solutions") {
-                        await this.call_webhook(call_id);
-                    };
+                    // if (fetch_client.name === "New Funding Solutions") {
+                    //     await this.call_webhook(call_id);
+                    // };
                 } else if (is_callback) {
                     sentimentStatus = callSentimentenum.CALLBACK;
                 } else if (is_dnc) {
@@ -633,6 +633,12 @@ class CallService extends RootService {
                 };
 
                 await callHistoryModel.create(callData);
+
+                if (fetch_client.name === "New Funding Solutions") {
+                    if (call_transferred || is_call_scheduled) {
+                        await this.call_webhook(call_id);
+                    };
+                };
 
                 const jobId = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id: null;
 
