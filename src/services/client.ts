@@ -1732,7 +1732,19 @@ class ClientService extends RootService {
                         break;
                     case (Category.WRONG):
                         query.reply_category = 7;
-                        break;                    
+                        break;
+                    case (Category.UNCATEGORIZED):
+                        query.reply_category = 8;
+                        break;
+                    case (Category.SEN_BOUNCED):
+                        query.reply_category = 9;
+                        break;
+                    case (Category.FUTURE):
+                        query.reply_category = 18824;
+                        break;
+                    case (Category.AUTO_RESPONSE):
+                        query.reply_category = 19034;
+                        break;  
                 };
             };
 

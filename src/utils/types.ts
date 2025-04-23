@@ -248,5 +248,9 @@ export enum Category {
   WRONG = "wrong_person",
   OOF = "out_of_office",
   INFORMATION = "information_request",
-  DNC = "do_not_contact"
+  DNC = "do_not_contact",
+  UNCATEGORIZED = "uncategorized",
+  SEN_BOUNCED = "sender_bounced",
+  FUTURE = "interested_future",
+  AUTO_RESPONSE = "automated_response"
 };
