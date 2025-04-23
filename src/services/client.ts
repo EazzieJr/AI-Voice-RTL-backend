@@ -1711,42 +1711,10 @@ class ClientService extends RootService {
             };
 
             if (category) {
-                switch (category) {
-                    case (Category.INTERESTED):
-                        query.reply_category = 1;
-                        break;
-                    case (Category.SCHEDULED):
-                        query.reply_category = 2;
-                        break;
-                    case (Category.UNINTERESTED):
-                        query.reply_category = 3;
-                        break;
-                    case (Category.DNC):
-                        query.reply_category = 4;
-                        break;
-                    case (Category.INFORMATION):
-                        query.reply_category = 5;
-                        break;
-                    case (Category.OOF):
-                        query.reply_category = 6;
-                        break;
-                    case (Category.WRONG):
-                        query.reply_category = 7;
-                        break;
-                    case (Category.UNCATEGORIZED):
-                        query.reply_category = 8;
-                        break;
-                    case (Category.SEN_BOUNCED):
-                        query.reply_category = 9;
-                        break;
-                    case (Category.FUTURE):
-                        query.reply_category = 18824;
-                        break;
-                    case (Category.AUTO_RESPONSE):
-                        query.reply_category = 19034;
-                        break;  
-                };
+                query.reply_category = category;
             };
+
+            console.log("query: ", query);
 
             const totalRecords = await ReplyModel.countDocuments(query);
             const totalPages = Math.ceil(totalRecords / limit);
