@@ -971,7 +971,7 @@ class CallService extends RootService {
 
             const options = {
                 method: "GET",
-                url: `https://api.retell.ai/v2/get-call/${callId}`,
+                url: `https://api.retellai.com/v2/get-call/${call_id}`,
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${RETELL_KEY}`
