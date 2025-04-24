@@ -16,6 +16,7 @@ import { DateTime } from "luxon";
 import Retell from "retell-sdk";
 import { userModel } from "../models/userModel";
 import { limits } from "argon2";
+import { url } from "inspector";
 
 class CallService extends RootService {
 
@@ -961,11 +962,27 @@ class CallService extends RootService {
             const fetch_details = await contactModel.findOne({ callId });
             if (!fetch_details) return console.error("No details found for callId: ", callId);
             console.log("retell details: ", fetch_details);
-            const { firstname, lastname, address, city, state, zipCode, phone, sid, oid, referenceToCallId, employmentStatus, creditEstimate, email } = fetch_details;
+            const { firstname, lastname, address, city, state, zipCode, phone, sid, oid, employmentStatus, creditEstimate, email } = fetch_details;
 
             const fetch_transcript = await EventModel.findOne({ callId });
             console.log("transcript details: ", fetch_transcript);
-            // if (!fetch_transcript) return console.error("No transcript found for callId: ", callId);
+
+            const RETELL_KEY = process.env.RETELL_API_KEY;
+
+            const options = {
+                method: "GET",
+                url: `https://api.retell.ai/v2/get-call/${callId}`,
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${RETELL_KEY}`
+                }
+            };
+
+            const call_response = await axios(options);
+            const call_deets = call_response.data;
+
+            const { custom_analysis_data } = call_deets.call_analysis;
+            const debtAmount = custom_analysis_data?.user_total_unsecured_debt || null;
 
             const recordingUrl = fetch_transcript?.recordingUrl || "";
 
@@ -981,8 +998,8 @@ class CallService extends RootService {
                 pOID: oid,
                 pRecordingUrl: recordingUrl,
                 pEmploymentStatus: employmentStatus,
-                pCreditEstimate: creditEstimate,
-                pEmail: email
+                pEmail: email,
+                pDebtAmount: debtAmount
             };
             console.log("body_to_send: ", body_to_send);
 
