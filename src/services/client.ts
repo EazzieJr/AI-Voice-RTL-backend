@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate } = body;
+            const { agentIds, startDate, endDate, date } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -249,6 +249,10 @@ class ClientService extends RootService {
                     $gte: new Date(startDate),
                     $lte: new Date(endDate)
                 }
+            };
+
+            if (date) {
+                query.date = date;
             };
 
             const callHistory = await callHistoryModel
@@ -270,7 +274,6 @@ class ClientService extends RootService {
                 const lastCalled = lead?.datesCalled[0] || "";
                 const timestamp = history.startTimestamp || 0;
                 const time = DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
-                console.log("time: ", time);
 
                 return {
                     callId: history.callId || "",
