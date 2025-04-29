@@ -1982,7 +1982,7 @@ export class Server {
         const token = jwt.sign(
           { userId: userInDb._id, isAdmin: userInDb.isAdmin },
           process.env.JWT_SECRET,
-          { expiresIn: "6d" },
+          { expiresIn: "30d" },
         );
 
         // make trigger

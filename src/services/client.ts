@@ -268,6 +268,9 @@ class ClientService extends RootService {
                 const lead = await contactModel.findOne({ callId: history.callId }).lean();
                 const calledTimes = lead?.calledTimes || 0;
                 const lastCalled = lead?.datesCalled[0] || "";
+                const timestamp = history.startTimestamp || 0;
+                const time = DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
+                console.log("time: ", time);
 
                 return {
                     callId: history.callId || "",
@@ -286,7 +289,10 @@ class ClientService extends RootService {
                     recording: history.recordingUrl || "",
                     address: history.address || "",
                     callAttempts: calledTimes || 0, // Add the calledTimes field
-                    lastCalled
+                    lastCalled,
+                    time,
+                    callType: history.callType || "",
+                    disconnectionReason: history.disconnectionReason || "",
                 };
 
             }));
