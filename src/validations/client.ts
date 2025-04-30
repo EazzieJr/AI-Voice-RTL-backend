@@ -10,7 +10,8 @@ export const CallHistorySchema = Joi.object({
     page: Joi.number(),
     startDate: Joi.date(),
     endDate: Joi.date(),
-    date: Joi.date()
+    date: Joi.date(),
+    sentiment: Joi.string()
 });
 
 export const UploadCSVSchema = Joi.object({
