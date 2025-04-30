@@ -98,18 +98,28 @@ class CallService extends RootService {
 
             const client = await userModel.findOne({ 'agents.agentId': agentId });
             
-            if (minutes >= 5000) {
-                if (client.name === "New Funding Solutions") {
-                    return;
-                } else {
-                    return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
+            // if (minutes >= 5000) {
+            //     if (client.name === "New Funding Solutions") {
+            //         return;
+            //     } else {
+            //         return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
 
-                };
-                // return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
+            //     };
+            //     // return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
+            // } else if (minutes >= 4500) {
+            //     // trigger notification
+            //     console.log("Minutes quota has exceeded 4500 minutes");
+            // };
+
+            if (minutes >= 5000) {
+                if (client?.name === "New Funding Solutions") {
+                    console.log("Quota exceeded but ignoring for New Funding Solutions");
+                } else {
+                    return res.status(400).json({ message: "Quota of 5000 minutes reached" });
+                }
             } else if (minutes >= 4500) {
-                // trigger notification
-                console.log("Minutes quota has exceeded 4500 minutes");
-            };
+                console.log("Minutes quota exceeded 4500");
+            }
 
             const call_schedule = await scheduleCronJob(
                 scheduledTimePST,
