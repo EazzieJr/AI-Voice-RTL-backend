@@ -112,8 +112,8 @@ class CallService extends RootService {
             // };
 
             if (minutes >= 5000) {
-                if (client?.name === "New Funding Solutions") {
-                    console.log("Quota exceeded but ignoring for New Funding Solutions");
+                if (client?.name === "Executive Strategy Group") {
+                    console.log("Quota exceeded but ignoring for Executive Strategy Group");
                 } else {
                     return res.status(400).json({ message: "Quota of 5000 minutes reached" });
                 }
