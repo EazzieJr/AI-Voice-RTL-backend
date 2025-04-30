@@ -95,9 +95,17 @@ class CallService extends RootService {
             const lowerCaseTag = tag.toLowerCase();
 
             const minutes = await this.fetch_minutes(agentId, next) as number;
+
+            const client = await userModel.findOne({ 'agents.agentId': agentId });
             
             if (minutes >= 5000) {
-                return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
+                if (client.name === "New Funding Solutions") {
+                    return;
+                } else {
+                    return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
+
+                };
+                // return res.status(400).json({ message: "Quota of 5000 minutes has been reached" });
             } else if (minutes >= 4500) {
                 // trigger notification
                 console.log("Minutes quota has exceeded 4500 minutes");
