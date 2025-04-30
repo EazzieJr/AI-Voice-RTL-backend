@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment } = body;
+            const { agentIds, startDate, endDate, date, sentiment, status } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -257,6 +257,10 @@ class ClientService extends RootService {
 
             if (sentiment) {
                 query.userSentiment = sentiment;
+            };
+
+            if (status) {
+                query.callStatus = status;
             };
 
             console.log("query: ", query);
