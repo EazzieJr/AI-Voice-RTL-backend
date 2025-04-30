@@ -21,4 +21,8 @@ router
         call_service.correct_contacts(req, res, next);
     })
 
+    .post("/inbound-webhook", (req: Request, res: Response, next: NextFunction) => {
+        call_service.inbound_call_webhook(req, res, next);
+    })
+
 export default router;

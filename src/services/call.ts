@@ -367,110 +367,6 @@ class CallService extends RootService {
         };
     };
 
-    // async call_analyzed(payload: any) {
-    //     try {
-    //         console.log("call_analyzed: ", payload);
-    //         const { event, data, call } = payload;
-    //         // console.log("pay: ", payload);
-
-    //         const { transcript, call_analysis, retell_llm_dynamic_variables, recording_url } = data;
-    //         const { agent_id, call_id, to_number } = call;
-
-    //         if (event === "call_analyzed") {
-    //             let analyzedTranscriptForSentiment;
-    //             let sentimentStatus;
-
-    //             analyzedTranscriptForSentiment = await reviewTranscript(transcript);
-
-    //             const is_scheduled = analyzedTranscriptForSentiment.message.content === "scheduled";
-    //             const is_dnc = analyzedTranscriptForSentiment.message.content === "dnc";
-    //             const is_callback = analyzedTranscriptForSentiment.message.content === "call-back";
-    //             const is_neutral = data.call_analysis.user_sentiment === "Neutral";
-    //             const is_unknown = data.call_analysis.user_sentiment === "Unknown";
-    //             const is_positive = data.call_analysis.user_sentiment === "Positive";
-    //             const is_negative = data.call_analysis.user_sentiment === "Negative";
-
-    //             let addressStat;
-    //             if (agent_id === "") {
-    //                 addressStat = call_analysis.address;
-    //             };
-                
-    //             if (is_scheduled) {
-    //                 sentimentStatus = callSentimentenum.SCHEDULED;
-    //             } else if (is_callback) {
-    //                 sentimentStatus = callSentimentenum.CALLBACK;
-    //             } else if (is_dnc) {
-    //                 sentimentStatus = callSentimentenum.DNC;
-    //             } else if (is_neutral) {
-    //                 sentimentStatus = callSentimentenum.NEUTRAL;
-    //             } else if (is_positive) {
-    //                 sentimentStatus = callSentimentenum.POSITIVE;
-    //             } else if (is_negative) {
-    //                 sentimentStatus = callSentimentenum.NEGATIVE;
-    //             } else if (is_unknown) {
-    //                 sentimentStatus = callSentimentenum.UNKNOWN;
-    //             };
-    //             // console.log("senti: ", sentimentStatus);
-
-    //             const event_data_to_update = {
-    //                 retellCallSummary: call_analysis.call_summary,
-    //                 analyzedTranscript: sentimentStatus,
-    //                 userSentiment: sentimentStatus
-    //             };
-
-    //             const results = await EventModel.findOneAndUpdate(
-    //                 { callId: call_id, agentId: agent_id },
-    //                 { $set: event_data_to_update },
-    //                 { returnOriginal: false }
-    //             );
-
-    //             // console.log("res: ", results);
-
-    //             const data2 = {
-    //                 callSummary: call_analysis.call_summary,
-    //                 userSentiment: sentimentStatus,
-    //             };
-
-    //             await callHistoryModel.findOneAndUpdate(
-    //                 { callId: call_id, agentId: agent_id },
-    //                 { $set: data2 },
-    //                 { returnOriginal: false },
-    //             );
-
-    //             try {
-    //                 // const result = await contactModel.findOne({
-    //                 //     callId: call.call_id,
-    //                 //     agent: call.agent_id
-    //                 // });
-
-    //                 if (call_analysis.call_successful === false && analyzedTranscriptForSentiment.message.content === "interested") {
-
-    //                     const result = await axios.post(process.env.MAKE_URL, {
-    //                         firstname: retell_llm_dynamic_variables.user_firstname,
-    //                         lastname: retell_llm_dynamic_variables.user_lastname,
-    //                         email: retell_llm_dynamic_variables.user_email,
-    //                         phone: to_number,
-    //                         summary: call_analysis.call_summary,
-    //                         url: recording_url || null,
-    //                         transcript: transcript,
-    //                     });
-
-    //                     // console.log("result: ", result);
-    //                 };
-    //             } catch (e) {
-    //                 console.error("error with axios result: ", + e);
-    //             };
-                
-    //         } else {
-    //             console.error("Event must be call_ended", event);
-    //         };
-
-    //     } catch (e) {
-    //         console.error("Error fetching data after call analyzed: " + e);
-    //         // next(e);
-    //     };
-    // };
-
     async call_analyzed(payload: any, todayString: string, todaysDateForDatesCalled: any, time: any) {
         try {
             const { event, call } = payload;
@@ -1006,6 +902,32 @@ class CallService extends RootService {
 
         } catch (e) {
             console.error("Error with call webhook: " + e);
+        };
+    };
+
+    async inbound_call_webhook(req: Request, res: Response, next: NextFunction): Promise<Response> {
+        try {
+            const payload = req.body;
+
+            const { event, call_inbound } = payload;
+            console.log("payload: ", payload);
+
+            if (event === "call_inbound") {
+                console.log("inside the call_inbound event: ", call_inbound);
+
+                return res.status(200).json({
+                    call_inbound: {}
+                });
+
+            } else {
+                return res.status(500).json({
+                    error: "Invalid event detected",
+                    event_gotten: event
+                });
+            };
+        } catch (e) {
+            console.error("Error with incoming call webhook: " + e);
+            next(e);
         };
     };
 };
