@@ -296,6 +296,7 @@ class ClientService extends RootService {
                     time,
                     callType: history.callType || "",
                     disconnectionReason: history.disconnectionReason || "",
+                    direction: history.direction || ""
                 };
 
             }));
