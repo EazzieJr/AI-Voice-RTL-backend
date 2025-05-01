@@ -299,6 +299,8 @@ class ClientService extends RootService {
                 const lastCalled = lead?.datesCalled[0] || "";
                 const timestamp = history.startTimestamp || 0;
                 const time = DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
+                const durationParts = history.durationMs.split(":");
+                const formattedDuration = `${durationParts[1]}:${durationParts[2]}`;
 
                 return {
                     callId: history.callId || "",
@@ -307,7 +309,7 @@ class ClientService extends RootService {
                     email: history.userEmail || "",
                     phone: history.toNumber || "",
                     agentId: history.agentId || "",
-                    duration: history.durationMs || "",
+                    duration: formattedDuration || "",
                     status: history.callStatus || "",
                     dial_status: history.dial_status || "",
                     transcript: history.transcript || "",

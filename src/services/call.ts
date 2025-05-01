@@ -99,14 +99,15 @@ class CallService extends RootService {
             const client = await userModel.findOne({ 'agents.agentId': agentId });
             
             if (minutes >= 5000) {
-                if (client?.name === "Executive Strategy Group") {
-                    console.log("Quota exceeded but ignoring for Executive Strategy Group");
-                } else {
-                    return res.status(400).json({ message: "Quota of 5000 minutes reached" });
-                }
+                // if (client?.name === "Executive Strategy Group") {
+                //     console.log("Quota exceeded but ignoring for Executive Strategy Group");
+                // } else {
+                //     return res.status(400).json({ message: "Quota of 5000 minutes reached" });
+                // }
+                return res.status(400).json({ message: "Quota of 5000 minutes reached" });
             } else if (minutes >= 4500) {
                 console.log("Minutes quota exceeded 4500");
-            }
+            };
 
             const call_schedule = await scheduleCronJob(
                 scheduledTimePST,
