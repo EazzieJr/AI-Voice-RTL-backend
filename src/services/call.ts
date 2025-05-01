@@ -981,9 +981,11 @@ class CallService extends RootService {
                 case (calloutcome.DNC):
                     query.userSentiment = callSentimentenum.DNC;
                     callOutcome = calloutcome.DNC;
-                    break;
+                    break;                  
                 // case (calloutcome.WRONG_NUMBER):
             };
+
+            if (!callOutcome) return res.status(400).json({ message: "Invalid outcome" });
 
             console.log("query: ", query);
             console.log("outcome: ", outcome);
@@ -1004,7 +1006,8 @@ class CallService extends RootService {
 
             return res.status(200).json({
                 success: true,
-                message: `Call histories updated to ${outcome}`
+                message: `Call histories updated to ${outcome}`,
+                result: updateOutcome
             });
 
         } catch (e) {
