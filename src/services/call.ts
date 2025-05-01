@@ -422,6 +422,7 @@ class CallService extends RootService {
                 const dial_no_answer = disconnection_reason === "dial_no_answer";
                 const call_inactivity = disconnection_reason === 'inactivity';
                 const call_hangedup = disconnection_reason === "user_hangup" || disconnection_reason === "agent_hangup";
+                const call_error = disconnection_reason === "error_inbound_webhook" || "error_llm_websocket_open" || "error_llm_websocket_lost_connection" || "error_llm_websocket_runtime" || "error_llm_websocket_corrupt_payload" || "error_frontend_corrupted_payload" || "error_twilio" || "error_no_audio_received" || "error_asr" || "error_retell" || "error_unknown" || "error_user_not_joined";
 
                 analyzedTranscriptForStatus = await reviewTranscript(transcript);
 
@@ -443,6 +444,7 @@ class CallService extends RootService {
 
                 statsUpdate.$inc.totalCalls = 1;
                 statsUpdate.$inc.totalCallDuration = duration_ms;
+                let callError;
 
                 if (is_machine) {
                     statsUpdate.$inc.totalAnsweredByVm = 1;
@@ -468,6 +470,8 @@ class CallService extends RootService {
                 } else if (call_hangedup) {
                     statsUpdate.$inc.totalCallAnswered = 1;
                     callStatus = callstatusenum.CALLED;
+                } else if (call_error) {
+                    callError = callstatusenum.ERROR;
                 };
 
                 if (is_call_scheduled) {
@@ -509,7 +513,7 @@ class CallService extends RootService {
                     userLastname: retell_llm_dynamic_variables?.user_lastname || null,
                     userEmail: retell_llm_dynamic_variables?.user_email || null,
                     recordingUrl: recording_url || null,
-                    disconnectionReason: disconnection_reason || null,
+                    disconnectionReason: callError || disconnection_reason || null,
                     callStatus: call_status,
                     startTimestamp: start_timestamp || null,
                     endTimestamp: end_timestamp || null,

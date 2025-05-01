@@ -73,7 +73,8 @@ export enum callstatusenum {
   SCHEDULED = "appt-scheduled",
   NO_ANSWER = "not-answered",
   IVR = "connected-ivr",
-  INACTIVITY = "inactivity"
+  INACTIVITY = "inactivity",
+  ERROR = "error"
 }
 
 // export enum callSentimentenum{
