@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment, status } = body;
+            const { agentIds, startDate, endDate, date, sentiment, status, tag } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -261,6 +261,21 @@ class ClientService extends RootService {
 
             if (status) {
                 query.callStatus = status;
+            };
+
+            if (tag) {
+                const leadsWithTag = await contactModel.find({ tag, callId: { $exists: true, $ne: "" } }).select("email callId").lean();
+
+                const callIds = leadsWithTag.map((lead) => lead.callId);
+
+                if (!callIds || callIds.length === 0) {
+                    return res.status(200).json({
+                        result: [],
+                        message: "No history found for the given tag"
+                    });
+                };
+
+                query.callId = { $in: callIds}
             };
 
             console.log("query: ", query);
