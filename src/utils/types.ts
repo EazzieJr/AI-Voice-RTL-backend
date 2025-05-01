@@ -255,3 +255,12 @@ export enum Category {
   FUTURE = "interested_future",
   AUTO_RESPONSE = "automated_response"
 };
+
+export enum calloutcome {
+  SUCCESS = "successful",
+  FAILED = "unsuccessful",
+  SCHEDULED = "appointment",
+  TRANSFERRED = "call_transfer",
+  DNC = "dnc",
+  WRONG_NUMBER = "wrong_number",
+};

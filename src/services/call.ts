@@ -1,7 +1,7 @@
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
 import RootService from "./_root";
 import { Request, Response, NextFunction } from "express";
-import { callSentimentenum, callstatusenum, jobstatus } from "../utils/types";
+import { callSentimentenum, callstatusenum, jobstatus, calloutcome } from "../utils/types";
 import { reviewCallback, reviewTranscript } from "../utils/transcript-review";
 import callHistoryModel from "../models/historyModel";
 import { DailyStatsModel } from "../models/logModel";
@@ -403,6 +403,7 @@ class CallService extends RootService {
             let analyzedTranscriptForStatus;
             let callStatus;
             let sentimentStatus;
+            let callOutcome;
             let statsUpdate: any = { $inc: {} };
 
             function convertMsToHourMinSec(ms: number): string {
@@ -455,12 +456,15 @@ class CallService extends RootService {
                 } else if (is_call_scheduled) {
                     statsUpdate.$inc.totalAppointment = 1;
                     callStatus = callstatusenum.SCHEDULED;
+                    callOutcome = calloutcome.SCHEDULED
                 } else if (call_failed) {
                     statsUpdate.$inc.totalFailed = 1;
                     callStatus = callstatusenum.FAILED;
+                    callOutcome = calloutcome.FAILED;
                 } else if (call_transferred) {
                     statsUpdate.$inc.totalTransffered = 1;
                     callStatus = callstatusenum.TRANSFERRED;
+                    callOutcome = calloutcome.TRANSFERRED
                 } else if (dial_no_answer) {
                     statsUpdate.$inc.totalDialNoAnswer = 1;
                     callStatus = callstatusenum.NO_ANSWER;
@@ -470,6 +474,7 @@ class CallService extends RootService {
                 } else if (call_hangedup) {
                     statsUpdate.$inc.totalCallAnswered = 1;
                     callStatus = callstatusenum.CALLED;
+                    callOutcome = calloutcome.SUCCESS;
                 } else if (call_error) {
                     callError = callstatusenum.ERROR;
                 };
@@ -480,6 +485,7 @@ class CallService extends RootService {
                     sentimentStatus = callSentimentenum.CALLBACK;
                 } else if (is_dnc) {
                     sentimentStatus = callSentimentenum.DNC;
+                    callOutcome = calloutcome.DNC;
                 } else if (is_neutral) {
                     sentimentStatus = callSentimentenum.NEUTRAL;
                 } else if (is_positive) {
@@ -530,7 +536,8 @@ class CallService extends RootService {
                     address: retell_llm_dynamic_variables?.user_address || null,
                     dial_status: callStatus,
                     callSummary: call_analysis.call_summary || null,
-                    userSentiment: sentimentStatus
+                    userSentiment: sentimentStatus,
+                    call_outcome: callOutcome || null,
                 };
 
                 await callHistoryModel.create(callData);
