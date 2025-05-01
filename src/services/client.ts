@@ -323,7 +323,8 @@ class ClientService extends RootService {
                     time,
                     callType: history.callType || "",
                     disconnectionReason: history.disconnectionReason || "",
-                    direction: history.direction || ""
+                    direction: history.direction || "",
+                    callOutcome: history.call_outcome || ""
                 };
 
             }));
