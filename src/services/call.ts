@@ -17,6 +17,7 @@ import Retell from "retell-sdk";
 import { userModel } from "../models/userModel";
 import { limits } from "argon2";
 import { url } from "inspector";
+import { TimeSeriesReducers } from "redis";
 
 class CallService extends RootService {
 
@@ -456,7 +457,6 @@ class CallService extends RootService {
                 } else if (is_call_scheduled) {
                     statsUpdate.$inc.totalAppointment = 1;
                     callStatus = callstatusenum.SCHEDULED;
-                    callOutcome = calloutcome.SCHEDULED
                 } else if (call_failed) {
                     statsUpdate.$inc.totalFailed = 1;
                     callStatus = callstatusenum.FAILED;
@@ -481,6 +481,7 @@ class CallService extends RootService {
 
                 if (is_call_scheduled) {
                     sentimentStatus = callSentimentenum.SCHEDULED;
+                    callOutcome = calloutcome.SCHEDULED;
                 } else if (is_callback) {
                     sentimentStatus = callSentimentenum.CALLBACK;
                 } else if (is_dnc) {
@@ -944,6 +945,70 @@ class CallService extends RootService {
             };
         } catch (e) {
             console.error("Error with incoming call webhook: " + e);
+            next(e);
+        };
+    };
+
+    async call_outcome_script(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> { 
+        try {
+            const agentId = req.query.agentId as string;
+            const outcome = req.query.outcome as string;
+
+            let callOutcome;
+            let query: { [key: string]: any } = {
+                agentId,
+                call_outcome: { $exists: false }
+            };
+
+            switch (outcome) {
+                case (calloutcome.SCHEDULED):
+                    query.userSentiment = callSentimentenum.SCHEDULED;
+                    callOutcome = calloutcome.SCHEDULED;
+                    break;
+                case (calloutcome.SUCCESS):
+                    query.disconnectionReason = { $in: ["user_hangup", "agent_hangup"] };
+                    query.userSentiment = { $ne: callSentimentenum.DNC };
+                    callOutcome = calloutcome.SUCCESS;
+                    break;
+                case (calloutcome.FAILED):
+                    query.disconnectionReason = "dial_failed";
+                    callOutcome = calloutcome.FAILED;
+                    break;
+                case (calloutcome.TRANSFERRED):
+                    query.disconnectionReason = "call_transfer";
+                    callOutcome = calloutcome.TRANSFERRED;
+                    break;
+                case (calloutcome.DNC):
+                    query.userSentiment = callSentimentenum.DNC;
+                    callOutcome = calloutcome.DNC;
+                    break;
+                // case (calloutcome.WRONG_NUMBER):
+            };
+
+            console.log("query: ", query);
+            console.log("outcome: ", outcome);
+            console.log("callOutcome: ", callOutcome);
+
+            const updateOutcome = await callHistoryModel.updateMany(
+                query,
+                {
+                    $set: {
+                        call_outcome: callOutcome
+                    }
+                }
+            );
+
+            console.log("updateOutcome: ", updateOutcome);
+
+            if (!updateOutcome.acknowledged) return res.status(500).json({ message: "Unable to update call outcome" });
+
+            return res.status(200).json({
+                success: true,
+                message: `Call histories updated to ${outcome}`
+            });
+
+        } catch (e) {
+            console.error("Error with call outcome script: " + e);
             next(e);
         };
     };

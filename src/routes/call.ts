@@ -25,4 +25,8 @@ router
         call_service.inbound_call_webhook(req, res, next);
     })
 
+    .put("/update-outcome", (req: AuthRequest, res: Response, next: NextFunction) => {
+        call_service.call_outcome_script(req, res, next);
+    })
+
 export default router;
