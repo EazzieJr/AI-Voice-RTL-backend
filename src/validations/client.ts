@@ -84,3 +84,8 @@ export const EditProfileSchema = Joi.object({
     name: Joi.string(),
     agent: Joi.string()
 });
+
+export const AddNoteSchema = Joi.object({
+    callId: Joi.string().required(),
+    notes: Joi.string().required(),
+});

@@ -40,7 +40,8 @@ interface ICallData extends Document {
   date: { type: string };
   address:{type:string},
   dial_status:{type:string},
-  call_outcome:{type:string}
+  call_outcome:{type:string},
+  notes:{type:string}
 }
 
 const CallDataSchema = new Schema<ICallData>(
@@ -78,6 +79,7 @@ const CallDataSchema = new Schema<ICallData>(
     address:{type: String},
     dial_status:{type : String},
     call_outcome:{type : String},
+    notes:{type : String},
   },
   { timestamps: true },
 );

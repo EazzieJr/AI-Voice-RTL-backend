@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { calloutcome, callstatusenum, Category, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -2341,7 +2341,43 @@ class ClientService extends RootService {
             console.error("Error uploading SVG: " + e);
             next(e);
         };
-    }
+    };
+
+    async add_notes(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = AddNoteSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const fetch_client = await userModel.findById(clientId);
+            if (!fetch_client) return res.status(400).json({ error: "Client not found"});
+
+            const agentId = fetch_client.agents[0].agentId;
+            const { callId, notes } = body;
+
+            const check_callId = await callHistoryModel.findOne({ callId, agentId });
+            if (!check_callId) return res.status(400).json({ error: "CallId does not exist or is not under agentId" });
+
+            const update_note = await callHistoryModel.updateOne(
+                { callId },
+                { notes }
+            );
+
+            if (!update_note.acknowledged) return res.status(400).json({ error: "Unable to add notes" });
+
+            return res.status(200).json({
+                success: true,
+                message: "Notes added successfully",
+                update_note
+            });
+            
+        } catch (e) {
+            console.error("Error adding notes: " + e);
+            next(e);
+        };
+    };
 };
 
 export const client_service = new ClientService();

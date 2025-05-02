@@ -68,6 +68,10 @@ router
         "/upload-svg", 
         authenticate,
         load.single("svgFile"),
-        (req: AuthRequest, res: Response, next: NextFunction) => client_service.upload_svg(req, res, next))
+        (req: AuthRequest, res: Response, next: NextFunction) => client_service.upload_svg(req, res, next)
+    )
+
+    .post("/add-notes", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.add_notes(req, res, next))
+
 
 export default router; 
