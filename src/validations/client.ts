@@ -16,6 +16,7 @@ export const CallHistorySchema = Joi.object({
     tag: Joi.string(),
     contact: Joi.string(),
     disconnectionReason: Joi.string(),
+    callType: Joi.string()
 });
 
 export const UploadCSVSchema = Joi.object({

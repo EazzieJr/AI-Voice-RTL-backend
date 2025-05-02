@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason } = body;
+            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -338,6 +338,20 @@ class ClientService extends RootService {
                     query.disconnectionReason = { $in: errors };
                 } else {
                     query.disconnectionReason = disconnectionReason
+                };
+            };
+
+            if (callType) {
+                const callTypes = ["outbound", "inbound", "web"];
+
+                if (!callTypes.includes(callType)) {
+                    return res.status(400).json({ error: "Invalid call type" });
+                };
+
+                if (callType === "web") {
+                    query.callType = "web_call";
+                } else {
+                    query.direction = callType;
                 };
             };
 
