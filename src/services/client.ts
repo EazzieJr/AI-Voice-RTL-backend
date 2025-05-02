@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment, status, tag } = body;
+            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -264,7 +264,7 @@ class ClientService extends RootService {
             };
 
             if (tag) {
-                const leadsWithTag = await contactModel.find({ tag, callId: { $exists: true, $ne: "" } }).select("email callId").lean();
+                const leadsWithTag = await contactModel.find({ tag, callId: { $exists: true, $ne: "" } }).select("callId").lean();
 
                 const callIds = leadsWithTag.map((lead) => lead.callId);
 
@@ -276,6 +276,53 @@ class ClientService extends RootService {
                 };
 
                 query.callId = { $in: callIds}
+            };
+
+            if (contact) {
+                const leadContacts = await contactModel.find({
+                    $or: [
+                        {
+                            firstname: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            lastname: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            email: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            phone: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        }
+                    ],
+                    callId: {
+                        $exists: true,
+                        $ne: ""
+                    }
+                }).select("callId").lean();
+
+                const callIds = leadContacts.map((lead) => lead.callId);
+
+                if (!callIds || callIds.length === 0) {
+                    return res.status(200).json({
+                        result: [],
+                        message: "No history found for the given contact"
+                    });
+                };
+
+                query.callId = { $in: callIds };
+
             };
 
             console.log("query: ", query);
