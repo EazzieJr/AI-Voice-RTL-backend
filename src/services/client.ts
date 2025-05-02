@@ -2,7 +2,7 @@ import RootService from "./_root";
 import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/authRequest";
 import { format, toZonedTime } from "date-fns-tz";
-import { callstatusenum, Category, DateOption } from "../utils/types";
+import { calloutcome, callstatusenum, Category, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
 import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema } from "../validations/client";
@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType } = body;
+            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -357,6 +357,18 @@ class ClientService extends RootService {
                     query.callType = "web_call";
                 } else {
                     query.direction = callType;
+                };
+            };
+
+            if (callOutcome) {
+                if (callOutcome) {
+                    const validOutcomes = Object.values(calloutcome);
+                    
+                    if (!validOutcomes.includes(callOutcome)) {
+                        return res.status(400).json({ error: "Invalid call outcome" });
+                    };
+
+                    query.call_outcome = callOutcome;
                 };
             };
 
