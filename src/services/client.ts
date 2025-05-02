@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact } = body;
+            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -323,6 +323,22 @@ class ClientService extends RootService {
 
                 query.callId = { $in: callIds };
 
+            };
+
+            if (disconnectionReason) {
+                const reasons = ["user_hangup", "agent_hangup", "dial_failed", "dial_no_answer", "inactivity", "call_transfer", "voicemail_reached", "machine_detected", "max_duration_reached", "concurrency_limit_reached", "dial_busy", "error"];
+
+                if (!reasons.includes(disconnectionReason)) {
+                    return res.status(400).json({ error: "Invalid disconnection reason" });
+                };
+
+                if (disconnectionReason === "error") {
+                    const errors = ["error_inbound_webhook", "error_llm_websocket_open", "error_llm_websocket_lost_connection", "error_llm_websocket_runtime", "error_llm_websocket_corrupt_payload", "error_frontend_corrupted_payload", "error_twilio", "error_no_audio_received", "error_asr", "error_retell", "error_unknown", "error_user_not_joined"];
+
+                    query.disconnectionReason = { $in: errors };
+                } else {
+                    query.disconnectionReason = disconnectionReason
+                };
             };
 
             console.log("query: ", query);
