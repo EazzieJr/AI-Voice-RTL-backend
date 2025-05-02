@@ -256,6 +256,11 @@ class ClientService extends RootService {
             };
 
             if (sentiment) {
+                const sentiments = ["positive", "negative", "neutral", "unknown"];
+
+                if (!sentiments.includes(sentiment)) {
+                    return res.status(400).json({ error: "Invalid sentiment" });
+                };
                 query.userSentiment = sentiment;
             };
 
