@@ -85,8 +85,10 @@ import { script } from "./utils/script";
 import HTTP from "./middleware/handler";
 import routeHandlers from "./routes";
 import { recordModel } from "./models/recordModel";
+import { DailyReport } from "./utils/eodScheduler";
 
 connectDb();
+DailyReport();
 // const smee = new SmeeClient({
 //   source: process.env.SMEE_URL,
 //   target: "https://api.intuitiveagents.ai/webhook",
