@@ -1,4 +1,6 @@
 process.env.TZ = "America/Los_Angeles";
+import * as dotenv from "dotenv";
+dotenv.config();
 import cors from "cors";
 import { format, toZonedTime } from "date-fns-tz";
 import express, { Request, Response, Router } from "express";
