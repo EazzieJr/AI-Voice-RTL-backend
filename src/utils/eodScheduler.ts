@@ -7,14 +7,36 @@ import axios from "axios";
 import { ReplyModel } from "../models/emailReply";
 
 export const DailyReport = () => {
-    const job = schedule.scheduleJob("11 6 * * *", async () => {
+    const job = schedule.scheduleJob("12 8 * * *", async () => {
         console.log("Daily report job running at 4:00 AM every day.");
 
         try {
             const users = await userModel.find({ "agents.agentId": { $exists: true, $ne: null } }).select("name group agents").lean();
 
+            // const date = new Date().toISOString().split("T")[0];
+            const _date = new Date();
+            _date.setDate(_date.getDate() - 1);
+            const date = _date.toISOString().split("T")[0];
+
+            console.log("Date: ", date);
+
+            const usersToCheck = [];
             for (const user of users) {
-                const date = new Date().toISOString().split("T")[0];
+                const check_job = await jobModel.findOne({ agentId: user.agents[0].agentId, scheduledTime: {
+                    $gte: `${date}T00:00:00+00:00`,
+                    $lte: `${date}T23:59:59+00:00`
+                } }).lean();
+
+                if (!check_job) {
+                    console.log("No job found for agentId: ", user.agents[0].agentId);
+                } else {
+                    usersToCheck.push(user);
+                }
+            };
+
+            console.log("Users to check: ", usersToCheck);
+
+            for (const user of usersToCheck) {
                 const { name, group, agents } = user;
                 const agentId = agents[0].agentId; 
                 let email;
@@ -119,74 +141,80 @@ export const DailyReport = () => {
                     client_permision: object[]
                 };
 
+                let activeCampaigns;
+                let totalAnalytics: any;
+                let positiveReplies
+
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
             
                 if (!foundClient) {
                     console.log("Client not found for logo: ", name);
-                    continue;
-                };
-
-                const { id } = foundClient;
+                } else {
+                    const { id } = foundClient;
     
-                const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
-    
-                const campaign = await axios.get(url);
-                const all_campaigns = campaign.data;
+                    const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
         
-                const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id && campaign.status === "ACTIVE");
+                    const campaign = await axios.get(url);
+                    const all_campaigns = campaign.data;
+            
+                    const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id && campaign.status === "ACTIVE");
 
-                console.log("client_campaigns: ", client_campaigns);
-                const activeCampaigns = client_campaigns.length;
+                    console.log("client_campaigns: ", client_campaigns);
+                    activeCampaigns = client_campaigns.length;
 
-                const campaignIds = client_campaigns.map((campaign: any) => campaign.id);
+                    const campaignIds = client_campaigns.map((campaign: any) => campaign.id);
 
-                interface CampaignAnalytics {
-                    id: number,
-                    user_id: number,
-                    created_at: string,
-                    status: string,
-                    name: string,
-                    start_date: string,
-                    end_date: string,
-                    sent_count: string,
-                    unique_sent_count: string,
-                    open_count: string,
-                    unique_open_count: string,
-                    click_count: string,
-                    unique_click_count: string,
-                    reply_count: string,
-                    block_count: string,
-                    total_count: string,
-                    drafted_count: string,
-                    bounce_count: string,
-                    unsubscribed_count: string
-                };
-
-                let campaignAnalytics: CampaignAnalytics[] = [];
-                for (const campaignId of campaignIds) {
-                    const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${date}&end_date=${date}`;
-
-                    const analytics = await axios.get(url);
-                    const campaign_analytics = analytics.data;
-
-                    campaignAnalytics.push(campaign_analytics);
-
-                };
-
-                const totalAnalytics = campaignAnalytics.reduce((totals, analytics) => {
-                    const { sent_count, bounce_count, reply_count } = analytics;
-                    totals.sentCount += Number(sent_count || 0);
-                    totals.bounceCount += Number(bounce_count || 0);
-                    totals.replyCount += Number(reply_count || 0);
-                    return totals;
-                }, { sentCount: 0, openCount: 0, replyCount: 0, bounceCount: 0 });
-
-                const positiveReplies = await ReplyModel.countDocuments({
-                    time_replied: date,
-                    reply_category: {
-                        $in: [1, 2]
-                    }
-                });
+                    interface CampaignAnalytics {
+                        id: number,
+                        user_id: number,
+                        created_at: string,
+                        status: string,
+                        name: string,
+                        start_date: string,
+                        end_date: string,
+                        sent_count: string,
+                        unique_sent_count: string,
+                        open_count: string,
+                        unique_open_count: string,
+                        click_count: string,
+                        unique_click_count: string,
+                        reply_count: string,
+                        block_count: string,
+                        total_count: string,
+                        drafted_count: string,
+                        bounce_count: string,
+                        unsubscribed_count: string
+                    };
+    
+                    let campaignAnalytics: CampaignAnalytics[] = [];
+                    for (const campaignId of campaignIds) {
+                        const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${date}&end_date=${date}`;
+    
+                        const analytics = await axios.get(url);
+                        const campaign_analytics = analytics.data;
+    
+                        campaignAnalytics.push(campaign_analytics);
+    
+                    };
+    
+                    totalAnalytics = campaignAnalytics.reduce((totals, analytics) => {
+                        const { sent_count, bounce_count, reply_count } = analytics;
+                        totals.sentCount += Number(sent_count || 0);
+                        totals.bounceCount += Number(bounce_count || 0);
+                        totals.replyCount += Number(reply_count || 0);
+                        return totals;
+                    }, { sentCount: 0, openCount: 0, replyCount: 0, bounceCount: 0 });
+    
+                    positiveReplies = await ReplyModel.countDocuments({
+                        time_replied: {
+                            $gte: `${date}T00:00:00+00:00`,
+                            $lte: `${date}T23:59:59+00:00`
+                        },
+                        reply_category: {
+                            $in: [1, 2]
+                        }
+                    });
+                }
 
                 const body_to_send = {
                     name,
@@ -208,11 +236,11 @@ export const DailyReport = () => {
                             scheduledTime: scheduleTime
                         },
                         email: {
-                            activeCampaigns,
-                            sent: totalAnalytics.sentCount,
-                            replied: totalAnalytics.replyCount,
-                            positiveReplies,
-                            bounced: totalAnalytics.bounceCount,
+                            activeCampaigns: activeCampaigns || 0,
+                            sent: totalAnalytics?.sentCount || 0,
+                            replied: totalAnalytics?.replyCount || 0,
+                            positiveReplies: positiveReplies || 0,
+                            bounced: totalAnalytics?.bounceCount || 0,
                         }
                     }
 
@@ -220,11 +248,11 @@ export const DailyReport = () => {
 
                 console.log("body_to_send: ", body_to_send);
 
-                // const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
+                const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
 
-                // const result = response.data;
+                const result = response.data;
 
-                // console.log("Make response: ", result);
+                console.log("Make response: ", result);
                 console.log("Daily report done for: ", group);
             };
         } catch (e) {
