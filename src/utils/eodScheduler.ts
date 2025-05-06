@@ -6,8 +6,8 @@ import { jobModel } from "../models/contact_model";
 import axios from "axios";
 
 export const DailyReport = () => {
-    const job = schedule.scheduleJob("10 15 * * *", async () => {
-        console.log("Daily report job running at 3:10 PM every day.");
+    const job = schedule.scheduleJob("0 4 * * *", async () => {
+        console.log("Daily report job running at 4:00 AM every day.");
 
         try {
             const users = await userModel.find({ "agents.agentId": { $exists: true, $ne: null } }).select("name group agents").lean();
