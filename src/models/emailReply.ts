@@ -171,5 +171,3 @@ const replySchema = new Schema<IReply>({
 }, { timestamps: true });
 
 export const ReplyModel = model<IReply>("EmailReply", replySchema);
-
-// export const ReplyModel = model("EmailReply", replySchema);

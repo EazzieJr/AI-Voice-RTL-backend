@@ -4,9 +4,10 @@ import callHistoryModel from "../models/historyModel";
 import { DailyStatsModel } from "../models/logModel";
 import { jobModel } from "../models/contact_model";
 import axios from "axios";
+import { ReplyModel } from "../models/emailReply";
 
 export const DailyReport = () => {
-    const job = schedule.scheduleJob("0 4 * * *", async () => {
+    const job = schedule.scheduleJob("11 6 * * *", async () => {
         console.log("Daily report job running at 4:00 AM every day.");
 
         try {
@@ -36,6 +37,7 @@ export const DailyReport = () => {
                     email = "clearpath@tvagai.com";
                 };
 
+                // Fetching Voice Data
                 const stats = await DailyStatsModel.aggregate([
                     {
                         $match: {
@@ -97,6 +99,95 @@ export const DailyReport = () => {
                 });
                 const appointments = await callHistoryModel.countDocuments({ agentId, date, dial_status: "appt-scheduled" });
 
+                // Fetching Email Data
+                const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+
+                const clients = await axios.get(clients_url);
+                const clients_data = clients.data;
+
+                let foundClient;
+
+                interface ClientObject {
+                    id: number,
+                    name: string,
+                    email: string,
+                    uuid: string,
+                    created_at: string,
+                    user_id: number,
+                    logo: string,
+                    logo_url: any,
+                    client_permision: object[]
+                };
+
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+            
+                if (!foundClient) {
+                    console.log("Client not found for logo: ", name);
+                    continue;
+                };
+
+                const { id } = foundClient;
+    
+                const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+    
+                const campaign = await axios.get(url);
+                const all_campaigns = campaign.data;
+        
+                const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id && campaign.status === "ACTIVE");
+
+                console.log("client_campaigns: ", client_campaigns);
+                const activeCampaigns = client_campaigns.length;
+
+                const campaignIds = client_campaigns.map((campaign: any) => campaign.id);
+
+                interface CampaignAnalytics {
+                    id: number,
+                    user_id: number,
+                    created_at: string,
+                    status: string,
+                    name: string,
+                    start_date: string,
+                    end_date: string,
+                    sent_count: string,
+                    unique_sent_count: string,
+                    open_count: string,
+                    unique_open_count: string,
+                    click_count: string,
+                    unique_click_count: string,
+                    reply_count: string,
+                    block_count: string,
+                    total_count: string,
+                    drafted_count: string,
+                    bounce_count: string,
+                    unsubscribed_count: string
+                };
+
+                let campaignAnalytics: CampaignAnalytics[] = [];
+                for (const campaignId of campaignIds) {
+                    const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${date}&end_date=${date}`;
+
+                    const analytics = await axios.get(url);
+                    const campaign_analytics = analytics.data;
+
+                    campaignAnalytics.push(campaign_analytics);
+
+                };
+
+                const totalAnalytics = campaignAnalytics.reduce((totals, analytics) => {
+                    const { sent_count, bounce_count, reply_count } = analytics;
+                    totals.sentCount += Number(sent_count || 0);
+                    totals.bounceCount += Number(bounce_count || 0);
+                    totals.replyCount += Number(reply_count || 0);
+                    return totals;
+                }, { sentCount: 0, openCount: 0, replyCount: 0, bounceCount: 0 });
+
+                const positiveReplies = await ReplyModel.countDocuments({
+                    time_replied: date,
+                    reply_category: {
+                        $in: [1, 2]
+                    }
+                });
+
                 const body_to_send = {
                     name,
                     email,
@@ -115,6 +206,13 @@ export const DailyReport = () => {
                             minutesUsed,
                             listsCalled,
                             scheduledTime: scheduleTime
+                        },
+                        email: {
+                            activeCampaigns,
+                            sent: totalAnalytics.sentCount,
+                            replied: totalAnalytics.replyCount,
+                            positiveReplies,
+                            bounced: totalAnalytics.bounceCount,
                         }
                     }
 
@@ -122,11 +220,11 @@ export const DailyReport = () => {
 
                 console.log("body_to_send: ", body_to_send);
 
-                const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
+                // const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
 
-                const result = response.data;
+                // const result = response.data;
 
-                console.log("Make response: ", result);
+                // console.log("Make response: ", result);
                 console.log("Daily report done for: ", group);
             };
         } catch (e) {
