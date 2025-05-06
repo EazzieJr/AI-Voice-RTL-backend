@@ -230,7 +230,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome } = body;
+            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome, direction } = body;
             const page = parseInt(body.page) || 1;
 
             const pageSize = 100;
@@ -372,6 +372,16 @@ class ClientService extends RootService {
                 };
             };
 
+            if (direction) {
+                const directions = ["inbound", "outbound"];
+
+                if (!directions.includes(direction)) {
+                    return res.status(400).json({ error: "Invalid call direction" });
+                };
+
+                query.direction = direction;
+            }
+
             console.log("query: ", query);
 
             const callHistory = await callHistoryModel
@@ -394,10 +404,9 @@ class ClientService extends RootService {
                 const timestamp = history.startTimestamp || 0;
                 const time = DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
                 const formattedDuration = history.durationMs ? (() => {
-                    const durationParts = history.durationMs.split(":");
+                    const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
                     return `${durationParts[1]}:${durationParts[2]}`;
-                })()
-                : "00:00";     
+                })() : "00:00";     
 
                 return {
                     callId: history.callId || "",
