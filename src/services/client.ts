@@ -347,17 +347,13 @@ class ClientService extends RootService {
             };
 
             if (callType) {
-                const callTypes = ["outbound", "inbound", "web"];
+                const callTypes = ["web_call", "phone_call"];
 
                 if (!callTypes.includes(callType)) {
                     return res.status(400).json({ error: "Invalid call type" });
                 };
 
-                if (callType === "web") {
-                    query.callType = "web_call";
-                } else {
-                    query.direction = callType;
-                };
+                query.callType = callType
             };
 
             if (callOutcome) {
