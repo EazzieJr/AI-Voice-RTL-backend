@@ -7,7 +7,7 @@ import axios from "axios";
 import { ReplyModel } from "../models/emailReply";
 
 export const DailyReport = () => {
-    const job = schedule.scheduleJob("12 8 * * *", async () => {
+    const job = schedule.scheduleJob("0 15 * * *", async () => {
         console.log("Daily report job running at 4:00 AM every day.");
 
         try {
