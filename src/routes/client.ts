@@ -73,5 +73,6 @@ router
 
     .post("/add-notes", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.add_notes(req, res, next))
 
+    .post("/voice-kpi", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.voice_kpi(req, res, next))
 
 export default router; 

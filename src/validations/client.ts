@@ -90,3 +90,10 @@ export const AddNoteSchema = Joi.object({
     callId: Joi.string().required(),
     notes: Joi.string().required(),
 });
+
+export const VoiceKPISchema = Joi.object({
+    agentIds: Joi.array().items(Joi.string()).required(),
+    dateOption: Joi.string().required(),
+    data: Joi.string().required(),
+    page: Joi.number()
+});
