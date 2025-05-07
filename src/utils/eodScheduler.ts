@@ -7,18 +7,18 @@ import axios from "axios";
 import { ReplyModel } from "../models/emailReply";
 
 export const DailyReport = () => {
-    const job = schedule.scheduleJob("40 4 * * *", async () => {
+    const job = schedule.scheduleJob("0 15 * * *", async () => {
         console.log("Daily report job running at 4:00 AM every day.");
 
         try {
             const users = await userModel.find({ "agents.agentId": { $exists: true, $ne: null } }).select("name group agents").lean();
 
-            // const date = new Date().toISOString().split("T")[0];
-            const _date = new Date();
-            _date.setDate(_date.getDate() - 1);
-            const date = _date.toISOString().split("T")[0];
+            const date = new Date().toISOString().split("T")[0];
+            // const _date = new Date();
+            // _date.setDate(_date.getDate() - 1);
+            // const date = _date.toISOString().split("T")[0];
 
-            console.log("Date: ", date);
+            console.log("Date: ", date)
 
             const usersToCheck = [];
             for (const user of users) {
