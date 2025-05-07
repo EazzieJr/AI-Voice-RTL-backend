@@ -2487,9 +2487,13 @@ class ClientService extends RootService {
 
             switch (data) {
                 case "outbound":
-                    console.log("In here")
                     query.direction = "outbound";
-
+                    break;
+                case "liveAnswers":
+                    query.call_outcome = "successful";
+                    break;
+                case "automatedAnswers":
+                    query.disconnectionReason = { $in: ["voicemail_reached", "machine_detected"] };
                     break;
 
             };
@@ -2501,7 +2505,7 @@ class ClientService extends RootService {
                 .limit(pageSize)
                 .lean()
 
-            console.log("date filter: ", query);
+            console.log("queryyyyyyy: ", query);
 
             const callHistories = await Promise.all(callHistory.map(async (history) => {
                 const lead = await contactModel.findOne({ callId: history.callId }).lean();
@@ -2530,7 +2534,7 @@ class ClientService extends RootService {
                     summary: history.callSummary || "",
                     recording: history.recordingUrl || "",
                     address: history.address || "",
-                    callAttempts: calledTimes || 0, // Add the calledTimes field
+                    callAttempts: calledTimes || 0,
                     lastCalled,
                     time,
                     callType: history.callType || "",
