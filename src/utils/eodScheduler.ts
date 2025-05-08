@@ -57,6 +57,8 @@ export const DailyReport = () => {
                     email = "runway@tvagai.com";
                 } else if (group === "CPA") {
                     email = "clearpath@tvagai.com";
+                } else {
+                    email: user.email;
                 };
 
                 // Fetching Voice Data
