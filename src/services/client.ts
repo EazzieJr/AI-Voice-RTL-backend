@@ -2463,7 +2463,8 @@ class ClientService extends RootService {
                     break;
 
                 case DateOption.Total:
-                    query.date = {};
+                    // query.date = {};
+                    console.log("total");
 
                     break;
 
@@ -2495,8 +2496,14 @@ class ClientService extends RootService {
                 case "automatedAnswers":
                     query.disconnectionReason = { $in: ["voicemail_reached", "machine_detected"] };
                     break;
-
+                case "transfers":
+                    query.disconnectionReason = "call_transfer";
+                    break;
+                case "appointments":
+                    query.userSentiment = "scheduled";
+                    break;
             };
+            console.log("queryyyyyyy: ", query);
 
             const callHistory = await callHistoryModel
                 .find(query)
@@ -2504,8 +2511,6 @@ class ClientService extends RootService {
                 .skip(skip)
                 .limit(pageSize)
                 .lean()
-
-            console.log("queryyyyyyy: ", query);
 
             const callHistories = await Promise.all(callHistory.map(async (history) => {
                 const lead = await contactModel.findOne({ callId: history.callId }).lean();
