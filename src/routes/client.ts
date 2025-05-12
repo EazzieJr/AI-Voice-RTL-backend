@@ -75,4 +75,6 @@ router
 
     .post("/voice-kpi", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.voice_kpi(req, res, next))
 
+    .post("/export-live-answers", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.export_liveAnswers(req, res, next))
+
 export default router; 

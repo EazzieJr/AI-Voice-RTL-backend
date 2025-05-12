@@ -22,6 +22,8 @@ import { reviewTranscript } from "../utils/transcript-review";
 import argon2 from "argon2";
 import { cloudinary } from "../utils/upload";
 import streamifier from "streamifier";
+import { createObjectCsvWriter } from "csv-writer";
+import path from "path";
 
 class ClientService extends RootService {
     async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
@@ -2562,6 +2564,156 @@ class ClientService extends RootService {
 
         } catch (e) {
             console.error("Error fetching voice kpi: " + e);
+            next(e);
+        };
+    };
+
+    async export_liveAnswers(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+            // const body = req.body;
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found" });
+
+            const { agents } = check_user;
+            const agentId = agents[0].agentId;
+
+            const dateOption = req.body.dateOption as DateOption;
+
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = toZonedTime(now, timeZone);
+
+            let query: { [key: string]: any } = {
+                agentId,
+                disconnectionReason: {
+                    $in: ["user_hangup", "agent_hangup"]
+                },
+                userSentiment: {
+                    $ne: "dnc"
+                },
+            };
+
+            console.log("dateOption: ", dateOption);
+
+            switch (dateOption) {
+                case DateOption.ThisWeek:
+                    const weekdays: string[] = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = subDays(zonedNow, i);
+                        const dayOfWeek = day.getDay();
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                            const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                            weekdays.push(valid_day);
+                        };
+                    };
+
+                    query.date = {
+                        $gte: `${weekdays[weekdays.length - 1]}T00:00:00+00:00`,
+                        $lte: `${weekdays[0]}T23:59:59+00:00`
+                    };
+
+                    break;
+                
+                case DateOption.ThisMonth:
+                    const monthDates: string[] = [];
+                    for (let i = 0; i < now.getDate(); i++) {
+                        const day = subDays(now, i);
+                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                        monthDates.unshift(valid_day);
+                    };
+
+                    query.date = { $in: monthDates };
+
+                    break;
+
+                case DateOption.PastMonth:
+                    const pastDates: string[] = [];
+                    for (let i = 0; i < 30; i++) {
+                        const day = subDays(now, i);
+                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                        pastDates.unshift(valid_day);
+                    };
+
+                    query.date = { $in: pastDates };
+
+                    break;
+
+                case DateOption.Total:
+                    // query.date = {};
+                    console.log("total");
+
+                    break;
+
+                case DateOption.LAST_SCHEDULE:
+                    const recent_job = await jobModel
+                        .findOne({ agentId })
+                        .sort({ createdAt: -1 })
+                        .lean();
+
+                    console.log("recent job: ", recent_job);
+
+                    if (!recent_job) {
+                        query.date = {};
+                    } else {
+                        const dateToCheck = recent_job.scheduledTime.split("T")[0];
+                        query.date = dateToCheck;
+                    };
+
+                    break;
+            };
+
+            console.log("query: ", query);
+
+            const result = await callHistoryModel.aggregate([
+                {
+                    $match: query
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        firstName: "$userFirstname",
+                        lastName: "$userLastname",
+                        email: "$userEmail",
+                        dateCalled: "$date",
+                        transcript: "$transcript"
+                    }
+                }
+            ]);
+
+            const filePath = path.join(__dirname, "..", "..", "public", "answers.csv");
+
+            const csvWriter = createObjectCsvWriter({
+                path: filePath,
+                header: [
+                    { id: "firstName", title: "firstName" },
+                    { id: "lastName", title: "lastName" },
+                    { id: "email", title: "email" },
+                    { id: "dateCalled", title: "dateCalled" },
+                    { id: "transcript", title: "transcript" }
+                ]
+            });
+
+            await csvWriter.writeRecords(result);
+            console.log("csv file written successfully");
+
+            if (fs.existsSync(filePath)) {
+                res.setHeader(
+                    "Content-Disposition",
+                    "attachment; filename=answers.csv"
+                );
+                res.setHeader("Content-Type", "text/csv");
+
+                const fileStream = fs.createReadStream(filePath);
+                fileStream.pipe(res);
+            } else {
+                console.log("CSV FILE not found: ", filePath);
+                return res.status(404).send("CSV FILE not found")
+            };
+
+            console.log("the end");
+        } catch (e) {
+            console.error("Error exporting data: " + e);
             next(e);
         };
     };
