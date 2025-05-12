@@ -250,11 +250,11 @@ export const DailyReport = () => {
 
                 console.log("body_to_send: ", body_to_send);
 
-                // const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
+                const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
 
-                // const result = response.data;
+                const result = response.data;
 
-                // console.log("Make response: ", result);
+                console.log("Make response: ", result);
                 console.log("Daily report done for: ", group);
             };
         } catch (e) {
