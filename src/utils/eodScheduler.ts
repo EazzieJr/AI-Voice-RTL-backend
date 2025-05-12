@@ -250,15 +250,164 @@ export const DailyReport = () => {
 
                 console.log("body_to_send: ", body_to_send);
 
-                const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
+                // const response = await axios.post(`https://hook.us1.make.com/5nugogfgy1js6obkqqdd7tn3spz075nh`, body_to_send);
 
-                const result = response.data;
+                // const result = response.data;
 
-                console.log("Make response: ", result);
+                // console.log("Make response: ", result);
                 console.log("Daily report done for: ", group);
             };
         } catch (e) {
             console.error("Error in daily report job:", e);
         };
     });
-}
+};
+
+export const WeeklyReport = () => {
+    const job = schedule.scheduleJob("00 15 * * 5", async () => {
+        console.log("Weekly report job running at 5:00 PM every Friday.");
+        const today = new Date();
+        const dates = [];
+        for (let i = 0; i < 5; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            dates.unshift(date.toISOString().split("T")[0]);
+        }
+        console.log("Last 5 days (Monday through Friday):", dates);
+
+        try {
+            const users = await userModel.find({ "agents.agentId": { $exists: true, $ne: null } }).select("name group agents email").lean();
+
+            const usersToCheck = [];
+            for (const user of users) {
+                const check_job = await jobModel.findOne({ agentId: user.agents[0].agentId, scheduledTime: {
+                    $gte: `${dates[0]}T00:00:00+00:00`,
+                    $lte: `${dates[4]}T23:59:59+00:00`
+                } }).lean();
+
+                if (!check_job) {
+                    console.log("No job found for agentId: ", user.agents[0].agentId);
+                } else {
+                    usersToCheck.push(user);
+                };
+            };
+            console.log("Users to check: ", usersToCheck);
+
+            for (const user of usersToCheck) {
+                const { name, group, agents } = user;
+                const agentId = agents[0].agentId; 
+                let email;
+
+                if (group === "ARS") {
+                    email = "ars@tvagai.com";
+                } else if (group === "DME") {
+                    email = "dme@tvagai.com";
+                } else if (group === "ESG") {
+                    email = "esg@tvagai.com";
+                } else if (group === "KSA") {
+                    email = "ksa@tvagai.com";
+                } else if (group === "NFS") {
+                    email = "nfs@tvagai.com";
+                } else if (group === "CWS") {
+                    email = "cws@tvagai.com";
+                } else if (group === "RWY") {
+                    email = "runway@tvagai.com";
+                } else if (group === "CPA") {
+                    email = "clearpath@tvagai.com";
+                } else {
+                    console.log("email is heere: ", user.email);
+                    email: user.email;
+                };
+
+                // Fetching Voice Data
+                const stats = await DailyStatsModel.aggregate([
+                    {
+                        $match: {
+                            agentId,
+                            day: { $in: dates }
+                        }
+                    },
+                    {
+                        $group:{
+                            _id: null,
+                            outbound: { $sum: "$totalCalls" },
+                            liveAnswers: { $sum: "$totalCallAnswered" },
+                            transfers: { $sum: "$totalTransffered" },
+                            jobIds: { $push: "$jobProcessedBy" },
+                            totalDuration: { $sum: "$totalCallDuration" }
+                        }
+                    }
+                ]);
+
+                const outbound = stats[0]?.outbound || 0;
+                const liveAnswers = stats[0]?.liveAnswers || 0;
+                const transfers = stats[0]?.transfers || 0;
+
+                function convertMsToMinSec(ms: number): string {
+                    const totalSeconds = Math.floor(ms / 1000);
+                    const minutes = Math.floor(totalSeconds / 60);
+                    const seconds = totalSeconds % 60;
+    
+                    return `${String(minutes).padStart(2, "0")}`;
+                };
+    
+                const minutesUsed = convertMsToMinSec(stats[0]?.totalDuration || 0);
+
+                let scheduleTime;
+                let listsCalled = [];
+                const jobIds = stats[0]?.jobIds || [];
+
+                for (const jobId of jobIds) {
+                    const job_deets = await jobModel.findOne({ jobId }).lean();
+                    if (job_deets) {
+                        const { scheduledTime, tagProcessedFor } = job_deets;
+                        scheduleTime = scheduledTime;
+                        listsCalled.push(tagProcessedFor);
+                    };
+                    
+                };
+
+                const reasons = ["voicemail_reached", "machine_detected"]
+
+                const positive = await callHistoryModel.countDocuments({ agentId, date: { $in: dates }, userSentiment: "positive"});
+                const negative = await callHistoryModel.countDocuments({ agentId, date: { $in: dates }, userSentiment: "negative"});
+                const neutral = await callHistoryModel.countDocuments({ agentId, date: { $in: dates }, userSentiment: "neutral"});
+                const automatedAnswers = await callHistoryModel.countDocuments({ 
+                    agentId, 
+                    date: { $in: dates }, 
+                    disconnectionReason: {
+                        $in: reasons
+                    }
+                });
+                const appointments = await callHistoryModel.countDocuments({ agentId, date: { $in: dates }, dial_status: "appt-scheduled" });
+
+                const body_to_send = {
+                    name,
+                    email,
+                    group,
+                    dates,
+                    eowReport: {
+                        voice: {
+                            outbound,
+                            liveAnswers,
+                            automatedAnswers,
+                            transfers,
+                            appointments,
+                            positive,
+                            negative,
+                            neutral,
+                            minutesUsed,
+                            listsCalled,
+                            scheduledTime: scheduleTime
+                        }
+                    }
+                }
+
+
+                console.log("body: ", body_to_send);
+            }
+        } catch (e) {
+            console.error("Error in weekly report job:", e);
+        };
+    });
+};
