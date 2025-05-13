@@ -2622,7 +2622,10 @@ class ClientService extends RootService {
                         monthDates.unshift(valid_day);
                     };
 
-                    query.date = { $in: monthDates };
+                    query.date = {
+                        $gte: `${monthDates[0]}T00:00:00+00:00`,
+                        $lte: `${monthDates[monthDates.length - 1]}T23:59:59+00:00`
+                    };
 
                     break;
 
@@ -2669,6 +2672,9 @@ class ClientService extends RootService {
                     };
                     query.userSentiment = { $ne: "dnc" };
                     break;
+                
+                case "outbound":
+                    query.direction = "outbound"
             };
 
             console.log("query: ", query);
