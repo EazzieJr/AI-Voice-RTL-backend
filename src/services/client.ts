@@ -2637,7 +2637,6 @@ class ClientService extends RootService {
                         pastDates.unshift(valid_day);
                     };
 
-                    console.log("past: ", pastDates);
                     query.date = {
                         $gte: `${pastDates[0]}T00:00:00+00:00`,
                         $lte: `${pastDates[pastDates.length - 1]}T23:59:59+00:00`
@@ -2646,7 +2645,6 @@ class ClientService extends RootService {
                     break;
 
                 case DateOption.Total:
-                    // query.date = {};
                     console.log("total");
 
                     break;
@@ -2687,6 +2685,12 @@ class ClientService extends RootService {
 
                 case "appointments":
                     query.userSentiment = "scheduled";
+                    break;
+
+                case "automatedAnswers":
+                    query.disconnectionReason = {
+                        $in: ["voicemail_reached", "machine_detected"]
+                    };
                     break;
             };
 
