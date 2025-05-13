@@ -2637,7 +2637,11 @@ class ClientService extends RootService {
                         pastDates.unshift(valid_day);
                     };
 
-                    query.date = { $in: pastDates };
+                    console.log("past: ", pastDates);
+                    query.date = {
+                        $gte: `${pastDates[0]}T00:00:00+00:00`,
+                        $lte: `${pastDates[pastDates.length - 1]}T23:59:59+00:00`
+                    };
 
                     break;
 
@@ -2674,7 +2678,16 @@ class ClientService extends RootService {
                     break;
                 
                 case "outbound":
-                    query.direction = "outbound"
+                    query.direction = "outbound";
+                    break;
+                
+                case "transfers":
+                    query.disconnectionReason = "call_transfer";
+                    break;
+
+                case "appointments":
+                    query.userSentiment = "scheduled";
+                    break;
             };
 
             console.log("query: ", query);
