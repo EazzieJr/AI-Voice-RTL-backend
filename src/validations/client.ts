@@ -97,3 +97,8 @@ export const VoiceKPISchema = Joi.object({
     data: Joi.string().required(),
     page: Joi.number()
 });
+
+export const ExportKPISchema = Joi.object({
+    dateOption: Joi.string().required(),
+    data: Joi.string().required()
+});

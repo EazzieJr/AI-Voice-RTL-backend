@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { calloutcome, callstatusenum, Category, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema, VoiceKPISchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema, VoiceKPISchema, ExportKPISchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -2568,10 +2568,14 @@ class ClientService extends RootService {
         };
     };
 
-    async export_liveAnswers(req: AuthRequest, res: Response, next: NextFunction) {
+    async export_kpi(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const clientId = req.user._id;
-            // const body = req.body;
+            const body = req.body;
+
+            const { error } = ExportKPISchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found" });
 
@@ -2579,19 +2583,14 @@ class ClientService extends RootService {
             const agentId = agents[0].agentId;
 
             const dateOption = req.body.dateOption as DateOption;
+            const { data } = req.body;
 
             const timeZone = "America/Los_Angeles";
             const now = new Date();
             const zonedNow = toZonedTime(now, timeZone);
 
             let query: { [key: string]: any } = {
-                agentId,
-                disconnectionReason: {
-                    $in: ["user_hangup", "agent_hangup"]
-                },
-                userSentiment: {
-                    $ne: "dnc"
-                },
+                agentId
             };
 
             console.log("dateOption: ", dateOption);
@@ -2663,6 +2662,15 @@ class ClientService extends RootService {
                     break;
             };
 
+            switch (data) {
+                case "liveAnswers":
+                    query.disconnectionReason = {
+                        $in: ["user_hangup", "agent_hangup"]
+                    };
+                    query.userSentiment = { $ne: "dnc" };
+                    break;
+            };
+
             console.log("query: ", query);
 
             const result = await callHistoryModel.aggregate([
@@ -2717,6 +2725,7 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
 };
 
 export const client_service = new ClientService();
