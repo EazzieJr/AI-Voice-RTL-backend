@@ -888,9 +888,11 @@ class ClientService extends RootService {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
             } else if (name === "Cory Lopez-Warfield") {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else if (name === "ClearPath") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "ClearPath CFO Advisors");
             } else {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
-            }
+            };
 
             if (!foundClient) return res.status(400).json({ error: "Client not found in Intuitive Campaigns" });
 
