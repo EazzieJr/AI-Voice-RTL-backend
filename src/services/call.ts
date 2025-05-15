@@ -930,6 +930,10 @@ class CallService extends RootService {
             const { event, call_inbound } = payload;
             console.log("payload: ", payload);
 
+            // const minutes = await this.fetch_minutes("agent_600a6f113ef62871c2fa796222", next);
+
+            // console.log("minutes: ", minutes);
+
             if (event === "call_inbound") {
                 console.log("inside the call_inbound event: ", call_inbound);
 

@@ -5,7 +5,7 @@ import { format, toZonedTime } from "date-fns-tz";
 import { calloutcome, callstatusenum, Category, DateOption } from "../utils/types";
 import { subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema, VoiceKPISchema, ExportKPISchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema, VoiceKPISchema, ExportKPISchema, FetchRepliesSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -155,6 +155,15 @@ class ClientService extends RootService {
                 dial_status: callstatusenum.CALLED,
                 ...dateFilter
             });
+
+            // const stats = await callHistoryModel.aggregate([
+            //     {
+            //         $match: {
+            //             agentId: { $in: agentIds },
+            //             date: dateFilter2.day
+            //         }
+            //     },
+            // ]);
 
             const stats = await DailyStatsModel.aggregate([
                 {
@@ -1804,14 +1813,20 @@ class ClientService extends RootService {
     async fetch_replies(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
         try {
             const clientId = req.user._id;
-            const page = parseInt(req.query.page as string) || 1;
-            const campaign_id = req.query.campaignId as string;
-            const category = req.query.category as string;
+            const body = req.body;
+
+            const { error } = FetchRepliesSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const page = parseInt(req.body.page as string) || 1;
+            const campaign_id = req.body.campaignId as string;
+            const category = req.body.category as string[];
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
             const { name } = check_user;
+            // const { cam}
 
             const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
 
@@ -1852,7 +1867,7 @@ class ClientService extends RootService {
             };
 
             if (category) {
-                query.reply_category = category;
+                query.reply_category = { $in: category };
             };
 
             console.log("query: ", query);

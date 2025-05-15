@@ -102,3 +102,9 @@ export const ExportKPISchema = Joi.object({
     dateOption: Joi.string().required(),
     data: Joi.string().required()
 });
+
+export const FetchRepliesSchema = Joi.object({
+    campaignId: Joi.number(),
+    page: Joi.number(),
+    category: Joi.array().items(Joi.number())
+});
