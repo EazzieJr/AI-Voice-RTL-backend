@@ -128,7 +128,7 @@ class ClientService extends RootService {
                         dateFilter = {};
                         dateFilter2 = {};
                     } else {
-                        const dateToCheck = (await recent_job).scheduledTime.split("T")[0];
+                        const dateToCheck = recent_job.scheduledTime.split("T")[0];
 
                         dateFilter = { datesCalled: dateToCheck };
                         dateFilter2 = { day: dateToCheck };
@@ -160,7 +160,7 @@ class ClientService extends RootService {
             //     {
             //         $match: {
             //             agentId: { $in: agentIds },
-            //             date: dateFilter2.day
+            //             ...dateFilter2
             //         }
             //     },
             // ]);
@@ -1155,9 +1155,11 @@ class ClientService extends RootService {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
             } else if (name === "Cory Lopez-Warfield") {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else if (name === "ClearPath") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "ClearPath CFO Advisors");
             } else {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
-            }
+            };
 
             if (!foundClient) return res.status(400).json({ error: "Client not found in Intuitive Campaign" });
 
@@ -1302,9 +1304,11 @@ class ClientService extends RootService {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Digital Mavericks Media");
             } else if (name === "Cory Lopez-Warfield") {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === "Cory Warfield");
+            } else if (name === "ClearPath") {
+                foundClient = clients_data.find((client: ClientObject) => client.logo === "ClearPath CFO Advisors");
             } else {
                 foundClient = clients_data.find((client: ClientObject) => client.logo === name);
-            }
+            };
 
             if (!foundClient) return res.status(400).json({ error: "Client not found in Intuitive Campaigns"});
 
@@ -1789,6 +1793,10 @@ class ClientService extends RootService {
 
                 client = client_details._id;
 
+            } else if (client_name === "ClearPath CFO Advisors") {
+                const client_details = await userModel.findOne({ name: "ClearPath" }).select("-password -passwordHash");
+
+                client = client_details._id;
             } else {
                 const client_details = await userModel.findOne({ name: client_name }).select("-password -passwordHash");
 
