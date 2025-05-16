@@ -520,7 +520,7 @@ class CallService extends RootService {
                     userLastname: retell_llm_dynamic_variables?.user_lastname || null,
                     userEmail: retell_llm_dynamic_variables?.user_email || null,
                     recordingUrl: recording_url || null,
-                    disconnectionReason: callError || disconnection_reason || null,
+                    disconnectionReason: disconnection_reason || callError || null,
                     callStatus: call_status,
                     startTimestamp: start_timestamp || null,
                     endTimestamp: end_timestamp || null,

@@ -48,6 +48,7 @@ class ClientService extends RootService {
 
             let dateFilter = {};
             let dateFilter2 = {};
+            let date_to_check: {};
 
             const timeZone = "America/Los_Angeles";
             const now = new Date();
@@ -58,6 +59,7 @@ class ClientService extends RootService {
                 case DateOption.Today:
                     dateFilter = { datesCalled: today };
                     dateFilter2 = { day: today };
+                    date_to_check = { date: today };
 
                     break;
                 
@@ -67,7 +69,7 @@ class ClientService extends RootService {
 
                     dateFilter = { datesCalled: yesterday };
                     dateFilter2 = { day: yesterday };
-
+                    date_to_check = { date: yesterday };
                     break;
 
                 case DateOption.ThisWeek:
@@ -83,6 +85,7 @@ class ClientService extends RootService {
 
                     dateFilter = { datesCalled: { $in: weekdays }};
                     dateFilter2 = { day: { $in: weekdays }};
+                    date_to_check = { date: { $in: weekdays } };
 
                     break;
 
@@ -96,6 +99,7 @@ class ClientService extends RootService {
 
                     dateFilter = { datesCalled: { $in: monthDates } };
                     dateFilter2 = { day: { $in: monthDates } };
+                    date_to_check = { date: { $in: monthDates } };
 
                     break;
 
@@ -109,12 +113,14 @@ class ClientService extends RootService {
 
                     dateFilter = { datesCalled: { $in: pastDates } };
                     dateFilter2 = { day: { $in: pastDates } };
+                    date_to_check = { date: { $in: pastDates } };
 
                     break;
 
                 case DateOption.Total:
                     dateFilter = {};
                     dateFilter2 = {};
+                    date_to_check = {};
 
                     break;
 
@@ -127,11 +133,13 @@ class ClientService extends RootService {
                     if (!recent_job) {
                         dateFilter = {};
                         dateFilter2 = {};
+                        date_to_check = {};
                     } else {
                         const dateToCheck = recent_job.scheduledTime.split("T")[0];
 
                         dateFilter = { datesCalled: dateToCheck };
                         dateFilter2 = { day: dateToCheck };
+                        date_to_check = { date: dateToCheck };
                     };
 
                     break;
@@ -156,14 +164,13 @@ class ClientService extends RootService {
                 ...dateFilter
             });
 
-            // const stats = await callHistoryModel.aggregate([
-            //     {
-            //         $match: {
-            //             agentId: { $in: agentIds },
-            //             ...dateFilter2
-            //         }
-            //     },
-            // ]);
+            const totalAppointments = await callHistoryModel.countDocuments({
+                agentId: { $in: agentIds },
+                userSentiment: "scheduled",
+                ...date_to_check
+            });
+
+            console.log("Appointments: ", totalAppointments);
 
             const stats = await DailyStatsModel.aggregate([
                 {
@@ -215,7 +222,7 @@ class ClientService extends RootService {
                 totalAutomatedAnswers: automatedAnswers,
                 automatedRate: `${automatedRate.toFixed(2)}%`,
                 // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
-                totalAppointment: stats[0]?.totalAppointment || 0,
+                totalAppointment: totalAppointments,
                 totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
                 totalCalls,
                 // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
