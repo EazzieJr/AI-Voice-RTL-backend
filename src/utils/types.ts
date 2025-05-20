@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 export interface Utterance {
   role: "agent" | "user";
   content: string;
@@ -17,6 +19,7 @@ export interface RetellResponse {
 }
 
 export interface IContact {
+  _id?: mongoose.Types.ObjectId;
   firstname: string;
   lastname: string;
   email: string;
