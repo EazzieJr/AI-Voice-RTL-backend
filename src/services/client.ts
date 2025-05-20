@@ -209,7 +209,13 @@ class ClientService extends RootService {
             const totalCalls = stats[0]?.totalCalls || 0;
             const answerRate = (totalAnsweredCalls / totalCalls) * 100;
 
-            const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
+            // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
+            const automatedAnswers = await callHistoryModel.countDocuments({
+                agentId: { $in: agentIds },
+                disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] },
+                ...date_to_check
+            });
+            console.log("automatedAnswers: ", automatedAnswers);
 
             const automatedRate = (automatedAnswers / totalCalls) * 100;
 
@@ -2780,7 +2786,6 @@ class ClientService extends RootService {
             next(e);
         };
     };
-
 };
 
 export const client_service = new ClientService();

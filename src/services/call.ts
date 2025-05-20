@@ -549,6 +549,26 @@ class CallService extends RootService {
                     };
                 };
 
+                if (fetch_client.name === "Executive Strategy Group") {
+                    if (is_call_scheduled) {
+                        const data = {
+                            firstName: retell_llm_dynamic_variables.user_firstname || "",
+                            lastName: retell_llm_dynamic_variables.user_lastname || "",
+                            email: retell_llm_dynamic_variables.user_email || "",
+                            phone: to_number,
+                            transcript,
+                            dateCalled: todayString,
+                            outcome: callOutcome,
+                        };
+                        console.log("data: ", data);
+
+                        const response = await axios.post("https://hook.us1.make.com/f7ehb6rgll8ofebqn8h3vx4p7bowhp27", data);
+                        const result = response.data;
+
+                        console.log("result: ", result);
+                    };
+                };
+
                 const jobId = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id: null;
 
                 const statResults = await DailyStatsModel.findOneAndUpdate(
