@@ -14,7 +14,7 @@ import { scheduleCronJob } from "../utils/scheduleJob";
 import schedule from "node-schedule";
 import { DateTime } from "luxon";
 import Retell from "retell-sdk";
-import { userModel } from "../models/userModel";
+import { userModel, IUser } from "../models/userModel";
 import { limits } from "argon2";
 import { url } from "inspector";
 import { TimeSeriesReducers } from "redis";
@@ -562,8 +562,7 @@ class CallService extends RootService {
                         };
                         console.log("data: ", data);
 
-                        const response = await axios.post("https://hook.us1.make.com/f7ehb6rgll8ofebqn8h3vx4p7bowhp27", data);
-                        const result = response.data;
+                        const result = await this.booking_trigger(fetch_client, data);
 
                         console.log("result: ", result);
                     };
@@ -1039,6 +1038,29 @@ class CallService extends RootService {
             next(e);
         };
     };
+
+    async booking_trigger(client: IUser, data: any) {
+        try {
+            const { name, autoEmail, email } = client;
+            const body_to_send = {
+                ...data,
+                cName: name,
+                cMail: autoEmail ? autoEmail : email
+            };
+
+            console.log("body_to_send: ", body_to_send);
+
+            const response = await axios.post("https://hook.us1.make.com/f7ehb6rgll8ofebqn8h3vx4p7bowhp27", data);
+
+            const result = response.data;
+
+            return result;
+            
+        } catch (e) {
+            console.error("Error triggering make for a successful booking: " + e);
+        };
+    };
+    
 };
 
 export const call_service = new CallService();
