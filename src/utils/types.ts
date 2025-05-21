@@ -122,7 +122,9 @@ export interface Ijob {
   tagProcessedFor:string,
   createdAt:Date,
   completedPercent: string
-  totalContactToProcess: number
+  totalContactToProcess: number,
+  limit: number;
+  fromNumber: string;
 }
 
 export interface Ilogs {

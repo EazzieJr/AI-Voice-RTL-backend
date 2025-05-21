@@ -86,10 +86,12 @@ import HTTP from "./middleware/handler";
 import routeHandlers from "./routes";
 import { recordModel } from "./models/recordModel";
 import { DailyReport, WeeklyReport } from "./utils/eodScheduler";
+import { restartScheduledJobs } from "./utils/jobRecovery";
 
 connectDb();
 DailyReport();
 WeeklyReport();
+restartScheduledJobs();
 // const smee = new SmeeClient({
 //   source: process.env.SMEE_URL,
 //   target: "https://api.intuitiveagents.ai/webhook",

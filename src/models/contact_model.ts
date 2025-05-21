@@ -136,6 +136,8 @@ const jobschema = new Schema<Ijob>(
     tagProcessedFor: { type: String },
     completedPercent: { type: String },
     totalContactToProcess: { type: Number },
+    limit: { type: Number },
+    fromNumber: { type: String },
   },
   { timestamps: true },
 );

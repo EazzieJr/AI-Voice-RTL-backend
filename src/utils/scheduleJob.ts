@@ -53,7 +53,9 @@ export const scheduleCronJob = async (
             callstatus: jobstatus.QUEUED,
             scheduledTime: formattedDate,
             shouldContinueProcessing: true,
-            tagProcessedFor: lowerCaseTag
+            tagProcessedFor: lowerCaseTag,
+            limit,
+            fromNumber
         });
 
         if (!newJob._id) {
