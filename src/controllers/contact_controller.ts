@@ -380,6 +380,11 @@ export const updateContactAndTranscriptForClient = async (
       callStatus: update.status,
       recordingUrl: update.recordingUrl,
       address: update.address,
+      userFirstname: update.firstname,
+      userLastname: update.lastname,
+      userEmail: update.email,
+      agentId: update.agentId,
+      toNumber: update.phone
     });
 
     const dataForTranscriptModel = filterFields({
@@ -391,6 +396,7 @@ export const updateContactAndTranscriptForClient = async (
       recordingUrl: update.recordingUrl,
       address: update.address,
       analyzedTranscript: update.sentiment,
+      agentId: update.agentId
     });
 
     const updatedData: any = {};
