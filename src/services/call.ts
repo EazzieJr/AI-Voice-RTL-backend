@@ -566,6 +566,25 @@ class CallService extends RootService {
 
                         console.log("result: ", result);
                     };
+
+                    const { custom_analysis_data } = call_analysis;
+
+                    if (custom_analysis_data?.appointment_booking_failed) {
+                        const data = {
+                            firstName: retell_llm_dynamic_variables.user_firstname || "",
+                            lastName: retell_llm_dynamic_variables.user_lastname || "",
+                            email: retell_llm_dynamic_variables.user_email || "",
+                            phone: to_number,
+                            transcript,
+                            dateCalled: todayString,
+                            outcome: callOutcome,
+                        };
+                        console.log("data: ", data);
+
+                        const result = await this.booking_trigger(fetch_client, data);
+
+                        console.log("result: ", result);
+                    }
                 };
 
                 const jobId = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id: null;
@@ -1053,7 +1072,7 @@ class CallService extends RootService {
             return result;
 
         } catch (e) {
-            console.error("Error triggering make for a successful booking: " + e);
+            console.error("Error triggering make for a booking attempt: " + e);
         };
     };
     

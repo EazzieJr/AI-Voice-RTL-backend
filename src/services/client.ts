@@ -1283,7 +1283,6 @@ class ClientService extends RootService {
 
                 const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${startDate}&end_date=${endDate}`;
 
-
                 const analytics = await axios.get(analyticsUrl);
                 const campaign_analytics = analytics.data;
 
