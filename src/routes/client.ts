@@ -38,7 +38,7 @@ router
 
     .post("/reply-lead", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.reply_lead(req, res, next))
 
-    .get("/campaign-dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.campaign_dashboard(req, res, next))
+    .post("/campaign-dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.campaign_dashboard(req, res, next))
 
     .get("/campaign-overview", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.campaign_overview(req, res, next))
 

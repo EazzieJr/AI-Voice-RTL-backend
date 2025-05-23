@@ -1145,7 +1145,94 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { name } = check_user;
+            const { name, agents } = check_user;
+
+
+            const dateOption = req.body.dateOption as DateOption;
+
+            if (!Object.values(DateOption).includes(dateOption)) {
+                return res.status(400).json({ error: "Invalid date option" })
+            };
+
+            let startDate: string;
+            let endDate: string;
+
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = toZonedTime(now, timeZone);
+
+            switch (dateOption) {
+                case DateOption.ThisWeek:
+                    const weekdays: string[] = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = subDays(zonedNow, i);
+                        const dayOfWeek = day.getDay();
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                            const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                            weekdays.push(valid_day);
+                        };
+                    };
+
+                    startDate = `${weekdays[weekdays.length - 1]}`,
+                    endDate = `${weekdays[0]}`;
+
+                    break;
+                
+                case DateOption.ThisMonth:
+                    const monthDates: string[] = [];
+                    for (let i = 0; i < now.getDate(); i++) {
+                        const day = subDays(now, i);
+                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                        monthDates.unshift(valid_day);
+                    };
+
+                    startDate = `${monthDates[0]}`;
+                    endDate = `${monthDates[monthDates.length - 1]}`;
+
+                    break;
+
+                case DateOption.PastMonth:
+                    const pastDates: string[] = [];
+                    for (let i = 0; i < 30; i++) {
+                        const day = subDays(now, i);
+                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+                        pastDates.unshift(valid_day);
+                    };
+
+                    startDate = `${pastDates[0]}`;
+                    endDate = `${pastDates[pastDates.length - 1]}`;
+
+                    break;
+
+                case DateOption.Total:
+                    console.log("total");
+
+                    startDate = "2024-01-01";
+                    endDate = zonedNow.toISOString().split("T")[0];
+
+                    break;
+
+                case DateOption.LAST_SCHEDULE:
+                    const recent_job = await jobModel
+                        .findOne({ agentId: agents[0].agentId })
+                        .sort({ createdAt: -1 })
+                        .lean();
+
+                    if (!recent_job) {
+                        return res.status(400).json({ message: "No last schedule found" });
+                    } else {
+                        const date = recent_job.scheduledTime.split("T")[0];
+
+                        startDate = date;
+                        endDate = date;
+                    };
+
+                    break;
+
+            };
+
+            console.log("start: ", startDate);
+            console.log("end: ", endDate);
 
             const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
 
@@ -1194,63 +1281,44 @@ class ClientService extends RootService {
             for (const campaign of client_campaigns) {
                 const { id } = campaign;
 
-                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${startDate}&end_date=${endDate}`;
+
 
                 const analytics = await axios.get(analyticsUrl);
                 const campaign_analytics = analytics.data;
+
+                const campaign_details = campaign_analytics.data[0];
+
+                if (campaign_details) {
+                    result.push(campaign_details);
+                };
                 
-                result.push(campaign_analytics);
             };
+
+            console.log("result: ", result);
             
             interface CampaignObject {
-                id: number,
-                user_id: number,
-                created_at: string,
-                status: string,
-                name: string,
+                email_campaign_seq_id: number,
                 sent_count: string,
+                skipped_count: string,
                 open_count: string,
                 click_count: string,
                 reply_count: string,
-                block_count: string,
-                total_count: string,
-                sequence_count: string,
-                drafted_count: string,
-                tags: any,
-                unique_sent_count: string,
-                unique_open_count: string,
-                unique_click_count: string,
-                client_id: number,
                 bounce_count: string,
-                parent_campaign_id: any,
                 unsubscribed_count: string,
-                campaign_lead_stats: {
-                    total: number,
-                    paused: number,
-                    blocked: number,
-                    revenue: number,
-                    stopped: number,
-                    completed: number,
-                    inprogress: number,
-                    interested: number,
-                    notStarted: number
-                },
-                team_member_id: any,
-                send_as_plain_text: boolean,
-                client_name: string,
-                client_email: string,
-                client_company_name: string
+                failed_count: string,
+                stopped_count: string,
+                ln_connection_req_pending_count: string,
+                ln_connection_req_accepted_count: string,
+                ln_connection_req_skipped_sent_msg_count: string,
+                positive_reply_count: string
             };
 
             const summedValues: { [key: string]: number } = {};
 
-            const parent_keys = ["sent_count", "open_count", "click_count", "reply_count", "bounce_count"];
-            const stat_keys = ["total", "interested"];
+            const parent_keys = ["sent_count", "open_count", "click_count", "reply_count", "bounce_count", "positive_reply_count"];
 
             parent_keys.forEach((key) => {
-                summedValues[key] = 0;
-            });
-            stat_keys.forEach((key) => {
                 summedValues[key] = 0;
             });
 
@@ -1259,9 +1327,6 @@ class ClientService extends RootService {
                     summedValues[key] += parseInt(campaign[key as keyof CampaignObject] as string) || 0;
                 });
                 
-                stat_keys.forEach((key) => {
-                    summedValues[key] += campaign.campaign_lead_stats[key as keyof typeof campaign.campaign_lead_stats] || 0;
-                });
             });
 
             const dashboard = {
@@ -1269,9 +1334,9 @@ class ClientService extends RootService {
                 replied: summedValues.reply_count,
                 opened: summedValues.open_count,
                 clicked: summedValues.click_count,
-                positive_reply: summedValues.interested,
+                positive_reply: summedValues.positive_reply_count,
                 bounced: summedValues.bounce_count,
-                contacts: summedValues.total
+                contacts: summedValues.total_count
             };
 
             return res.status(200).json({
@@ -2788,6 +2853,76 @@ class ClientService extends RootService {
             next(e);
         };
     };
+
+    async email_kpi(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const body = req.body;
+
+            const { agentId, stamp, page } = body;
+            console.log("stamp: ", stamp)
+            const RETELL_KEY = process.env.RETELL_API_KEY;
+
+            const data = {
+                sort_order: "ascending",
+                limit: 1000,
+                filter_criteria: {
+                    agent_id: [agentId],
+                    disconnection_reason: ["voicemail_reached", "machine_detected"],
+                    start_timestamp: {
+                        lower_threshold: stamp
+                    }
+                },
+                ...(page && { pagination_key: page })
+            };
+            console.log("data: ", data);
+
+            const options = {
+                method: "post",
+                url: `https://api.retellai.com/v2/list-calls`,
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${RETELL_KEY}`
+                },
+                data
+            };
+            // 1746086420000
+
+            const response = await axios(options);
+            const response_data = response.data;
+
+            console.log("resp: ", response_data);
+            console.log("length: ", response_data.length);
+            
+        
+            const calls = response_data.map((call: any) => ({
+                updateOne: {
+                    filter: { callId: call.call_id },
+                    update: {
+                        $set: { disconnectionReason: call.disconnection_reason}
+                    }
+                }
+            }));
+
+            console.log(JSON.stringify(calls, null, 2));
+
+            const result = await callHistoryModel.bulkWrite(calls);
+
+            console.log("res: ", result);
+            console.log("data: ", data);
+
+            return res.status(200).json({
+                success: true,
+                result
+            });
+
+            // console.log("length: ", response_data.length);
+            // console.log("calls: ", calls);
+        } catch (e) {
+            console.error("Error fetching email kpi: " + e);
+            next(e);
+        };
+    };
+
 };
 
 export const client_service = new ClientService();
