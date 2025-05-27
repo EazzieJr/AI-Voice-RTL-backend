@@ -550,41 +550,78 @@ class CallService extends RootService {
                 };
 
                 if (fetch_client.name === "Executive Strategy Group") {
-                    if (is_call_scheduled) {
-                        const data = {
-                            firstName: retell_llm_dynamic_variables.user_firstname || "",
-                            lastName: retell_llm_dynamic_variables.user_lastname || "",
-                            email: retell_llm_dynamic_variables.user_email || "",
-                            phone: to_number,
-                            transcript,
-                            dateCalled: todayString,
-                            outcome: callOutcome,
-                        };
-                        console.log("data: ", data);
-
-                        const result = await this.booking_trigger(fetch_client, data);
-
-                        console.log("result: ", result);
+                    const data = {
+                        firstName: retell_llm_dynamic_variables.user_firstname || "",
+                        lastName: retell_llm_dynamic_variables.user_lastname || "",
+                        email: retell_llm_dynamic_variables.user_email || "",
+                        phone: to_number,
+                        transcript,
+                        dateCalled: todayString,
+                        outcome: callOutcome,
                     };
 
                     const { custom_analysis_data } = call_analysis;
 
-                    if (custom_analysis_data?.appointment_booking_failed) {
-                        const data = {
-                            firstName: retell_llm_dynamic_variables.user_firstname || "",
-                            lastName: retell_llm_dynamic_variables.user_lastname || "",
-                            email: retell_llm_dynamic_variables.user_email || "",
-                            phone: to_number,
-                            transcript,
-                            dateCalled: todayString,
-                            outcome: callOutcome,
+                    if (is_call_scheduled) {
+                        // const data = {
+                        //     firstName: retell_llm_dynamic_variables.user_firstname || "",
+                        //     lastName: retell_llm_dynamic_variables.user_lastname || "",
+                        //     email: retell_llm_dynamic_variables.user_email || "",
+                        //     phone: to_number,
+                        //     transcript,
+                        //     dateCalled: todayString,
+                        //     outcome: callOutcome,
+                        // };
+                        const data_to_send = {
+                            ...data,
+                            contact_details: custom_analysis_data?.contact_details || null,
+                            appointment_details: custom_analysis_data?.appointment_details || null,
+                            type: "appointment_booking_successful"
                         };
-                        console.log("data: ", data);
+                        console.log("data: ", data_to_send);
 
-                        const result = await this.booking_trigger(fetch_client, data);
+                        const result = await this.booking_trigger(fetch_client, data_to_send);
 
                         console.log("result: ", result);
-                    }
+                    };
+
+                    if (custom_analysis_data?.appointment_booking_failed) {
+                        // const data = {
+                        //     firstName: retell_llm_dynamic_variables.user_firstname || "",
+                        //     lastName: retell_llm_dynamic_variables.user_lastname || "",
+                        //     email: retell_llm_dynamic_variables.user_email || "",
+                        //     phone: to_number,
+                        //     transcript,
+                        //     dateCalled: todayString,
+                        //     outcome: callOutcome,
+                        // };
+                        const data_to_send = {
+                            ...data,
+                            contact_details: custom_analysis_data?.contact_details || null,
+                            failure_reason: custom_analysis_data?.failure_reason || null,
+                            type: "appointment_booking_failed"
+                        };
+                        console.log("data: ", data_to_send);
+
+                        const result = await this.booking_trigger(fetch_client, data_to_send);
+
+                        console.log("result: ", result);
+                    };
+
+                    if (custom_analysis_data?.appointment_booking_attempted) {
+                        const data_to_send = {
+                            ...data,
+                            contact_details: custom_analysis_data?.contact_details || null,
+                            appointment_details: custom_analysis_data?.appointment_details || null,
+                            type: "appointment_booking_attempted"
+                        };
+
+                        console.log("data: ", data_to_send);
+
+                        const result = await this.booking_trigger(fetch_client, data_to_send);
+
+                        console.log("result: ", result);
+                    };
                 };
 
                 const jobId = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id: null;
