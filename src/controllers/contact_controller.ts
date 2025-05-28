@@ -384,7 +384,8 @@ export const updateContactAndTranscriptForClient = async (
       userLastname: update.lastname,
       userEmail: update.email,
       agentId: update.agentId,
-      toNumber: update.phone
+      toNumber: update.phone,
+      call_outcome: update.call_outcome
     });
 
     const dataForTranscriptModel = filterFields({
