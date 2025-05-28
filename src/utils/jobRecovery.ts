@@ -6,7 +6,9 @@ import { executeJob } from "./jobExecutor";
 export const restartScheduledJobs = async () => {
     try {
         console.log("Restarting scheduled jobs...");
-        const now = new Date();
+        const now = moment().tz("America/Los_Angeles").format("YYYY-MM-DDTHH:mm:ss");
+
+        console.log("Current time: ", now);
 
         const pendingJobs = await jobModel.find({
             callstatus: jobstatus.QUEUED,
@@ -15,7 +17,7 @@ export const restartScheduledJobs = async () => {
         });
 
         if (!pendingJobs.length) {
-            console.log("No pending jobs");
+            console.log("No pending jobs", pendingJobs);
             return;
         };
 
