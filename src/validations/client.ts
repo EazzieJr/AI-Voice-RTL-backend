@@ -113,5 +113,6 @@ export const FetchRepliesSchema = Joi.object({
 export const CampaignDashboardSchema = Joi.object({
     startDate: Joi.date(),
     endDate: Joi.date(),
-    total: Joi.boolean()
+    total: Joi.boolean(),
+    date: Joi.date()
 });

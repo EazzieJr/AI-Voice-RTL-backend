@@ -1155,7 +1155,12 @@ class ClientService extends RootService {
             let start: string;
             let end: string;
 
-            const { startDate, endDate, total } = body;
+            const { startDate, endDate, total, date } = body;
+
+            if ((date && (startDate || endDate)) || (date && total)) {
+                return res.status(400).json({ error: "date cannot be used with startDate or endDate or total" });
+            };
+
             if ((startDate && !endDate) || (!startDate && endDate)) {
                 return res.status(400).json({ error: "startDate and endDate must be passed together"});
             };
@@ -1175,7 +1180,10 @@ class ClientService extends RootService {
             if (total === true) {
                 start = "2024-01-01";
                 end = zonedNow.toISOString().split("T")[0];
-            } else {
+            } else if (date) {
+                start = date;
+                end = date;
+            } else if (startDate && endDate) {
                 start = startDate;
                 end = endDate;
             };
