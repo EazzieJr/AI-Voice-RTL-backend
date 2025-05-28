@@ -741,19 +741,6 @@ class CallService extends RootService {
         };
     };
 
-    // async getAffectedContacts(tags: string[]) {
-    //     return contactModel.find({
-    //         dial_status: "not-called",
-    //         callId: {
-    //             $exists: true
-    //         },
-    //         tag: {
-    //             $in: tags
-    //         },
-    //         isDeleted: false
-    //     }, { callId: 1 }).lean().limit(1000);
-    // };
-
     async getAffectedContacts(tags: string[], page: number) {
         const callIds = await contactModel.find({
             dial_status: "not-called",
@@ -1004,6 +991,23 @@ class CallService extends RootService {
 
             const { event, call_inbound } = payload;
             console.log("payload: ", payload);
+
+            // const fetch_client = await userModel.findOne({ name });
+            // const data = {
+            //     firstName: "Atom",
+            //     lastName: "Sandler",
+            //     email: "atomsandler@outlook.com",
+            //     phone: "+12345678900",
+            //     transcript: "This is a test transcript for a failed booking attempt",
+            //     dateCalled: date,
+            //     outcome: calloutcome.SCHEDULED,
+            //     failure_reason: "invalid email",
+            //     contact_details: "lawwee@outlook.com",
+            //     type: "appointment_booking_failed"
+            // };
+
+            // const result = await this.booking_trigger(fetch_client, data);
+            // console.log("result: ", result);
 
             if (event === "call_inbound") {
                 console.log("inside the call_inbound event: ", call_inbound);

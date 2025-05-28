@@ -3,9 +3,9 @@ import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/authRequest";
 import { format, toZonedTime } from "date-fns-tz";
 import { calloutcome, callstatusenum, Category, DateOption } from "../utils/types";
-import { subDays } from "date-fns";
+import { endOfMinute, subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
-import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema, VoiceKPISchema, ExportKPISchema, FetchRepliesSchema } from "../validations/client";
+import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema, VoiceKPISchema, ExportKPISchema, FetchRepliesSchema, CampaignDashboardSchema } from "../validations/client";
 import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
@@ -1145,94 +1145,43 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { name, agents } = check_user;
+            const { name } = check_user;
 
+            const body = req.body;
 
-            const dateOption = req.body.dateOption as DateOption;
+            const { error } = CampaignDashboardSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, res, next);
 
-            if (!Object.values(DateOption).includes(dateOption)) {
-                return res.status(400).json({ error: "Invalid date option" })
+            let start: string;
+            let end: string;
+
+            const { startDate, endDate, total } = body;
+            if ((startDate && !endDate) || (!startDate && endDate)) {
+                return res.status(400).json({ error: "startDate and endDate must be passed together"});
             };
 
-            let startDate: string;
-            let endDate: string;
+            if (total && (startDate || endDate)) {
+                return res.status(400).json({ error: "total cannot be used with startDate or endDate" });
+            };
+
+            if (total === false && (!startDate || !endDate)) {
+                return res.status(400).json({ error: "startDate and endDate are required when total is false" });
+            };
 
             const timeZone = "America/Los_Angeles";
             const now = new Date();
             const zonedNow = toZonedTime(now, timeZone);
 
-            switch (dateOption) {
-                case DateOption.ThisWeek:
-                    const weekdays: string[] = [];
-                    for (let i = 0; i < 7; i++) {
-                        const day = subDays(zonedNow, i);
-                        const dayOfWeek = day.getDay();
-                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                            const valid_day = format(day, "yyyy-MM-dd", { timeZone });
-                            weekdays.push(valid_day);
-                        };
-                    };
-
-                    startDate = `${weekdays[weekdays.length - 1]}`,
-                    endDate = `${weekdays[0]}`;
-
-                    break;
-                
-                case DateOption.ThisMonth:
-                    const monthDates: string[] = [];
-                    for (let i = 0; i < now.getDate(); i++) {
-                        const day = subDays(now, i);
-                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
-                        monthDates.unshift(valid_day);
-                    };
-
-                    startDate = `${monthDates[0]}`;
-                    endDate = `${monthDates[monthDates.length - 1]}`;
-
-                    break;
-
-                case DateOption.PastMonth:
-                    const pastDates: string[] = [];
-                    for (let i = 0; i < 30; i++) {
-                        const day = subDays(now, i);
-                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
-                        pastDates.unshift(valid_day);
-                    };
-
-                    startDate = `${pastDates[0]}`;
-                    endDate = `${pastDates[pastDates.length - 1]}`;
-
-                    break;
-
-                case DateOption.Total:
-                    console.log("total");
-
-                    startDate = "2024-01-01";
-                    endDate = zonedNow.toISOString().split("T")[0];
-
-                    break;
-
-                case DateOption.LAST_SCHEDULE:
-                    const recent_job = await jobModel
-                        .findOne({ agentId: agents[0].agentId })
-                        .sort({ createdAt: -1 })
-                        .lean();
-
-                    if (!recent_job) {
-                        return res.status(400).json({ message: "No last schedule found" });
-                    } else {
-                        const date = recent_job.scheduledTime.split("T")[0];
-
-                        startDate = date;
-                        endDate = date;
-                    };
-
-                    break;
-
+            if (total === true) {
+                start = "2024-01-01";
+                end = zonedNow.toISOString().split("T")[0];
+            } else {
+                start = startDate;
+                end = endDate;
             };
 
-            console.log("start: ", startDate);
-            console.log("end: ", endDate);
+            console.log("start: ", start);
+            console.log("end: ", end);
 
             const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
 
@@ -1281,7 +1230,7 @@ class ClientService extends RootService {
             for (const campaign of client_campaigns) {
                 const { id } = campaign;
 
-                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${startDate}&end_date=${endDate}`;
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
 
                 const analytics = await axios.get(analyticsUrl);
                 const campaign_analytics = analytics.data;

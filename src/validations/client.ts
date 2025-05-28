@@ -1,4 +1,5 @@
 import Joi from "joi";
+import { start } from "repl";
 
 export const DashboardSchema = Joi.object({
     agentIds: Joi.array().items(Joi.string()).required(),
@@ -107,4 +108,10 @@ export const FetchRepliesSchema = Joi.object({
     campaignId: Joi.number(),
     page: Joi.number(),
     category: Joi.array().items(Joi.number())
+});
+
+export const CampaignDashboardSchema = Joi.object({
+    startDate: Joi.date(),
+    endDate: Joi.date(),
+    total: Joi.boolean()
 });
