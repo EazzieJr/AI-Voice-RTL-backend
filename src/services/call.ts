@@ -558,20 +558,12 @@ class CallService extends RootService {
                         transcript,
                         dateCalled: todayString,
                         outcome: callOutcome,
+                        recordingUrl: recording_url || null,
                     };
 
                     const { custom_analysis_data } = call_analysis;
 
                     if (is_call_scheduled) {
-                        // const data = {
-                        //     firstName: retell_llm_dynamic_variables.user_firstname || "",
-                        //     lastName: retell_llm_dynamic_variables.user_lastname || "",
-                        //     email: retell_llm_dynamic_variables.user_email || "",
-                        //     phone: to_number,
-                        //     transcript,
-                        //     dateCalled: todayString,
-                        //     outcome: callOutcome,
-                        // };
                         const data_to_send = {
                             ...data,
                             contact_details: custom_analysis_data?.contact_details || null,
@@ -586,15 +578,6 @@ class CallService extends RootService {
                     };
 
                     if (custom_analysis_data?.appointment_booking_failed) {
-                        // const data = {
-                        //     firstName: retell_llm_dynamic_variables.user_firstname || "",
-                        //     lastName: retell_llm_dynamic_variables.user_lastname || "",
-                        //     email: retell_llm_dynamic_variables.user_email || "",
-                        //     phone: to_number,
-                        //     transcript,
-                        //     dateCalled: todayString,
-                        //     outcome: callOutcome,
-                        // };
                         const data_to_send = {
                             ...data,
                             contact_details: custom_analysis_data?.contact_details || null,

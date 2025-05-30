@@ -423,7 +423,7 @@ class ClientService extends RootService {
                 const calledTimes = lead?.calledTimes || 0;
                 const lastCalled = lead?.datesCalled[0] || "";
                 const timestamp = history.startTimestamp || 0;
-                const time = DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
+                const time = DateTime.fromMillis(timestamp).toFormat('MM/dd/yyyy HH:mm');
                 const formattedDuration = history.durationMs ? (() => {
                     const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
                     return `${durationParts[1]}:${durationParts[2]}`;
