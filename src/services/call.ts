@@ -986,7 +986,8 @@ class CallService extends RootService {
             //     outcome: calloutcome.SCHEDULED,
             //     failure_reason: "invalid email",
             //     contact_details: "lawwee@outlook.com",
-            //     type: "appointment_booking_failed"
+            //     type: "appointment_booking_failed",
+            //     recordingUrl: "https://example.com/recording.mp3",
             // };
 
             // const result = await this.booking_trigger(fetch_client, data);
@@ -1081,10 +1082,12 @@ class CallService extends RootService {
     async booking_trigger(client: IUser, data: any) {
         try {
             const { name, autoEmail, email } = client;
+
+            const cmail = autoEmail ? autoEmail : email;
             const body_to_send = {
                 ...data,
                 cName: name,
-                cMail: autoEmail ? autoEmail : email
+                cMail: [cmail]
             };
 
             console.log("body_to_send: ", body_to_send);

@@ -206,8 +206,8 @@ class ClientService extends RootService {
 
             const combinedCallDuration = convertMsToMinSec(stats[0]?.totalCallDuration || 0);
 
-            // const totalCalls = stats[0]?.totalCalls || 0;
-            const totalCalls = await callHistoryModel.countDocuments({ agentId: { $in: agentIds } });
+            const totalCalls = stats[0]?.totalCalls || 0;
+            // const totalCalls = await callHistoryModel.countDocuments({ agentId: { $in: agentIds } });
             const answerRate = (totalAnsweredCalls / totalCalls) * 100;
 
             // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
@@ -1243,6 +1243,8 @@ class ClientService extends RootService {
 
                 const analytics = await axios.get(analyticsUrl);
                 const campaign_analytics = analytics.data;
+
+                console.log("campaign_analytics: ", campaign_analytics);
 
                 const campaign_details = campaign_analytics.data[0];
 
