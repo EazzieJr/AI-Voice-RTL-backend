@@ -427,7 +427,8 @@ class ClientService extends RootService {
                 const formattedDuration = history.durationMs ? (() => {
                     const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
                     return `${durationParts[1]}:${durationParts[2]}`;
-                })() : "00:00";     
+                })() : "00:00";
+                const tagToDisplay = lead.tag ? lead.tag.toLowerCase() : "";
 
                 return {
                     callId: history.callId || "",
@@ -452,7 +453,8 @@ class ClientService extends RootService {
                     disconnectionReason: history.disconnectionReason || "",
                     direction: history.direction || "",
                     callOutcome: history.call_outcome || "",
-                    notes: history.notes || ""
+                    notes: history.notes || "",
+                    tag: tagToDisplay || "",
                 };
 
             }));
