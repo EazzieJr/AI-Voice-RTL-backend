@@ -269,3 +269,12 @@ export enum calloutcome {
   DNC = "dnc",
   WRONG_NUMBER = "wrong_number",
 };
+
+export enum CampaignStatus {
+  ACTIVE = "ACTIVE",
+  PAUSED = "PAUSED",
+  COMPLETED = "COMPLETED",
+  DRAFTED = "DRAFTED",
+  STOPPED = "STOPPED",
+  ARCHIVED = "ARCHIVED"
+};

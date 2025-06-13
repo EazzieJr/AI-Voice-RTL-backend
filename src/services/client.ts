@@ -2,7 +2,7 @@ import RootService from "./_root";
 import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/authRequest";
 import { format, toZonedTime } from "date-fns-tz";
-import { calloutcome, callstatusenum, Category, DateOption } from "../utils/types";
+import { calloutcome, callstatusenum, Category, DateOption, CampaignStatus } from "../utils/types";
 import { endOfMinute, subDays } from "date-fns";
 import { contactModel, EventModel, jobModel } from "../models/contact_model";
 import { DashboardSchema, CallHistorySchema, UploadCSVSchema, CampaignStatisticsSchema, ForwardReplySchema, ReplyLeadSchema, AddWebhookSchema, AgentDataSchema, UpdateAgentIdSchema, ContactsSchema, EditProfileSchema, AddNoteSchema, VoiceKPISchema, ExportKPISchema, FetchRepliesSchema, CampaignDashboardSchema } from "../validations/client";
@@ -756,12 +756,28 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
+            const status = req.query.status as string;
+            const upperCaseStatus = status ? status.toUpperCase() : null;
+                        
+            if (status && !Object.values(CampaignStatus).includes(upperCaseStatus as CampaignStatus)) {
+                return res.status(400).json({ error: "Invalid campaign status" });
+            };
+
             const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
 
-            const campaigns = await axios.get(url);
-            const result = campaigns.data;
+            const campaigns_result = await axios.get(url);
+            const campaigns = campaigns_result.data;
 
-            if (!result) return res.status(400).json({ message: "all stats not found"});
+            let result: any[] = [];
+
+            if (status) {
+                const filteredCampaigns = campaigns.filter((campaign: any) => campaign.status === upperCaseStatus);
+                result = filteredCampaigns;
+            } else {
+                result = campaigns;
+            };
+
+            if (!result) return res.status(400).json({ message: "No campaigns not found"});
 
             return res.status(200).json({
                 success: true,
