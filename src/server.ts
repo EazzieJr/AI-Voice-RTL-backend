@@ -91,7 +91,7 @@ import { restartScheduledJobs } from "./utils/jobRecovery";
 connectDb();
 DailyReport();
 WeeklyReport();
-restartScheduledJobs();
+// restartScheduledJobs();
 // const smee = new SmeeClient({
 //   source: process.env.SMEE_URL,
 //   target: "https://api.intuitiveagents.ai/webhook",
