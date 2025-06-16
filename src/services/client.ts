@@ -892,6 +892,13 @@ class ClientService extends RootService {
             const clientId = req.user._id;
             const page = req.query.page as string;
 
+            const status = req.query.status as string;
+            const upperCaseStatus = status ? status.toUpperCase() : null;
+
+            if (status && !Object.values(CampaignStatus).includes(upperCaseStatus as CampaignStatus)) {
+                return res.status(400).json({ error: "Invalid campaign status" });
+            };
+
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
@@ -939,20 +946,29 @@ class ClientService extends RootService {
 
             const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id);
 
+            let campaigns: any[] = [];
+            
+            if (status) {
+                const filteredCampaigns = client_campaigns.filter((campaign: any) => campaign.status === upperCaseStatus);
+                campaigns = filteredCampaigns;
+            } else {
+                campaigns = client_campaigns;
+            };
+
             const limit = 15;
             const page_to_use = parseInt(page) || 1;
             const startIndex = (page_to_use - 1) * limit;
             const endIndex = page_to_use * limit;
-            const totalPages = Math.ceil(client_campaigns.length / limit);
+            const totalPages = Math.ceil(campaigns.length / limit);
 
 
-            if (page_to_use > totalPages) {
-                return res.status(400).json({
-                    error: "Page exceeds available data"
-                });
-            };
+            // if (page_to_use > totalPages) {
+            //     return res.status(400).json({
+            //         error: "Page exceeds available data"
+            //     });
+            // };
 
-            const campaignsToFetch = client_campaigns.slice(startIndex, endIndex);
+            const campaignsToFetch = campaigns.slice(startIndex, endIndex);
 
             let result: Object[] = [];
 
