@@ -1918,14 +1918,7 @@ export class Server {
 
         const userInDb = await userModel.findOne(
           { username },
-          {
-            "agents.agentId": 1,
-            passwordHash: 1,
-            isAdmin: 1,
-            username: 1,
-            group: 1,
-            name: 1,
-          },
+          { loginDetails: 0 }
         );
 
         if (!userInDb) {
@@ -2026,6 +2019,7 @@ export class Server {
             name: userInDb.name,
             agentIds: result,
             isUserAdmin: userInDb.isAdmin,
+            logo: userInDb.svgUrl || ""
           },
         });
       } catch (error) {
