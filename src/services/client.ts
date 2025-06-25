@@ -2920,7 +2920,7 @@ class ClientService extends RootService {
         try {
             const clientId = req.user._id;
 
-            const check_user = await userModel.findById(clientId).select("email username group name agents autoEmail").lean();
+            const check_user = await userModel.findById(clientId).select("email username group name agents autoEmail svgUrl").lean();
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
             const result = {
@@ -2929,7 +2929,8 @@ class ClientService extends RootService {
                 username: check_user.username,
                 group: check_user.group,
                 agentId: check_user?.agents[0]?.agentId || "",
-                autoEmail: check_user.autoEmail || check_user.email
+                autoEmail: check_user.autoEmail || check_user.email,
+                logo: check_user.svgUrl || ""
             };
 
             return res.status(200).json({
