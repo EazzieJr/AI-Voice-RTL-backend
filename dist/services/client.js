@@ -1,0 +1,2475 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.client_service = void 0;
+const _root_1 = __importDefault(require("./_root"));
+const date_fns_tz_1 = require("date-fns-tz");
+const types_1 = require("../utils/types");
+const date_fns_1 = require("date-fns");
+const contact_model_1 = require("../models/contact_model");
+const client_1 = require("../validations/client");
+const userModel_1 = require("../models/userModel");
+const logModel_1 = require("../models/logModel");
+const historyModel_1 = __importDefault(require("../models/historyModel"));
+const fs_1 = __importDefault(require("fs"));
+const csv_parser_1 = __importDefault(require("csv-parser"));
+const formatter_1 = require("../utils/formatter");
+const luxon_1 = require("luxon");
+const graphModel_1 = require("../models/graphModel");
+const axios_1 = __importDefault(require("axios"));
+const webhook_1 = require("../models/webhook");
+const emailReply_1 = require("../models/emailReply");
+const transcript_review_1 = require("../utils/transcript-review");
+const argon2_1 = __importDefault(require("argon2"));
+const upload_1 = require("../utils/upload");
+const streamifier_1 = __importDefault(require("streamifier"));
+const csv_writer_1 = require("csv-writer");
+const path_1 = __importDefault(require("path"));
+class ClientService extends _root_1.default {
+    async dashboard_stats(req, res, next) {
+        var _a, _b, _c;
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.DashboardSchema.validate(body, {
+                abortEarly: false
+            });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const dateOption = req.body.dateOption;
+            const { agentIds } = body;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            if (!Object.values(types_1.DateOption).includes(dateOption)) {
+                return res.status(400).json({ error: "Invalid date option" });
+            }
+            ;
+            let dateFilter = {};
+            let dateFilter2 = {};
+            let date_to_check;
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = (0, date_fns_tz_1.toZonedTime)(now, timeZone);
+            const today = (0, date_fns_tz_1.format)(zonedNow, "yyyy-MM-dd", { timeZone });
+            switch (dateOption) {
+                case types_1.DateOption.Today:
+                    dateFilter = { datesCalled: today };
+                    dateFilter2 = { day: today };
+                    date_to_check = { date: today };
+                    break;
+                case types_1.DateOption.Yesterday:
+                    const zonedYesterday = (0, date_fns_tz_1.toZonedTime)((0, date_fns_1.subDays)(now, 1), timeZone);
+                    const yesterday = (0, date_fns_tz_1.format)(zonedYesterday, "yyyy-MM-dd", { timeZone });
+                    dateFilter = { datesCalled: yesterday };
+                    dateFilter2 = { day: yesterday };
+                    date_to_check = { date: yesterday };
+                    break;
+                case types_1.DateOption.ThisWeek:
+                    const weekdays = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = (0, date_fns_1.subDays)(zonedNow, i);
+                        const dayOfWeek = day.getDay();
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                            const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                            weekdays.push(valid_day);
+                        }
+                        ;
+                    }
+                    ;
+                    dateFilter = { datesCalled: { $in: weekdays } };
+                    dateFilter2 = { day: { $in: weekdays } };
+                    date_to_check = { date: { $in: weekdays } };
+                    break;
+                case types_1.DateOption.ThisMonth:
+                    const monthDates = [];
+                    for (let i = 0; i < now.getDate(); i++) {
+                        const day = (0, date_fns_1.subDays)(now, i);
+                        const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                        monthDates.unshift(valid_day);
+                    }
+                    ;
+                    dateFilter = { datesCalled: { $in: monthDates } };
+                    dateFilter2 = { day: { $in: monthDates } };
+                    date_to_check = { date: { $in: monthDates } };
+                    break;
+                case types_1.DateOption.PastMonth:
+                    const pastDates = [];
+                    for (let i = 0; i < 30; i++) {
+                        const day = (0, date_fns_1.subDays)(now, i);
+                        const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                        pastDates.unshift(valid_day);
+                    }
+                    ;
+                    dateFilter = { datesCalled: { $in: pastDates } };
+                    dateFilter2 = { day: { $in: pastDates } };
+                    date_to_check = { date: { $in: pastDates } };
+                    break;
+                case types_1.DateOption.Total:
+                    dateFilter = {};
+                    dateFilter2 = {};
+                    date_to_check = {};
+                    break;
+                case types_1.DateOption.LAST_SCHEDULE:
+                    const recent_job = await contact_model_1.jobModel
+                        .findOne({ agentId: { $in: agentIds } })
+                        .sort({ createdAt: -1 })
+                        .lean();
+                    if (!recent_job) {
+                        dateFilter = {};
+                        dateFilter2 = {};
+                        date_to_check = {};
+                    }
+                    else {
+                        const dateToCheck = recent_job.scheduledTime.split("T")[0];
+                        dateFilter = { datesCalled: dateToCheck };
+                        dateFilter2 = { day: dateToCheck };
+                        date_to_check = { date: dateToCheck };
+                    }
+                    ;
+                    break;
+            }
+            ;
+            const totalContactForAgent = await contact_model_1.contactModel.countDocuments({
+                agentId: { $in: agentIds },
+                isDeleted: false
+            });
+            // const totalNotCalledForAgent = await contactModel.countDocuments({
+            //     agentId: { $in: agentIds },
+            //     isDeleted: false,
+            //     dial_status: callstatusenum.NOT_CALLED,
+            //     ...dateFilter
+            // });
+            const totalAnsweredCalls = await contact_model_1.contactModel.countDocuments(Object.assign({ agentId: { $in: agentIds }, isDeleted: false, dial_status: types_1.callstatusenum.CALLED }, dateFilter));
+            const totalAppointments = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, userSentiment: "scheduled" }, date_to_check));
+            console.log("Appointments: ", totalAppointments);
+            const stats = await logModel_1.DailyStatsModel.aggregate([
+                {
+                    $match: Object.assign({ agentId: { $in: agentIds } }, dateFilter2)
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCalls: { $sum: "$totalCalls" },
+                        totalAnsweredByVm: { $sum: "$totalAnsweredByVm" },
+                        totalAppointment: { $sum: "$totalAppointment" },
+                        totalCallsTransffered: { $sum: "$totalTransffered" },
+                        totalFailedCalls: { $sum: "$totalFailed" },
+                        totalAnsweredCalls: { $sum: "$totalCallAnswered" },
+                        totalAnsweredByIVR: { $sum: "$totalAnsweredByIVR" },
+                        totalCallInactivity: { $sum: "$totalCallInactivity" },
+                        totalCallDuration: { $sum: "$totalCallDuration" },
+                        totalDialNoAnswer: { $sum: "$totalDialNoAnswer" },
+                    }
+                }
+            ]);
+            function convertMsToMinSec(ms) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+            }
+            const combinedCallDuration = convertMsToMinSec(((_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalCallDuration) || 0);
+            const totalCalls = ((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCalls) || 0;
+            // const totalCalls = await callHistoryModel.countDocuments({ agentId: { $in: agentIds } });
+            const answerRate = (totalAnsweredCalls / totalCalls) * 100;
+            // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
+            const automatedAnswers = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
+            console.log("automatedAnswers: ", automatedAnswers);
+            const automatedRate = (automatedAnswers / totalCalls) * 100;
+            return res.status(200).json({
+                totalContactForAgent,
+                totalAnsweredCalls,
+                answerRate: `${answerRate.toFixed(2)}%`,
+                // totalNotCalledForAgent,
+                callDuration: combinedCallDuration,
+                totalAutomatedAnswers: automatedAnswers,
+                automatedRate: `${automatedRate.toFixed(2)}%`,
+                // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
+                totalAppointment: totalAppointments,
+                totalCallsTransferred: ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCallsTransffered) || 0,
+                totalCalls,
+                // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
+                // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
+                // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
+                // totalCallInactivity: stats[0]?.totalCallInactivity || 0
+            });
+        }
+        catch (error) {
+            console.error("Error fetching dashboard stats: ", error);
+            next(error);
+        }
+        ;
+    }
+    ;
+    async call_history(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.CallHistorySchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome, direction } = body;
+            const page = parseInt(body.page) || 1;
+            const pageSize = 100;
+            const skip = (page - 1) * pageSize;
+            let query = {
+                agentId: { $in: agentIds }
+            };
+            if ((startDate && !endDate) || (!startDate && endDate)) {
+                return res.status(400).json({ error: "Both start and end dates must be provided" });
+            }
+            ;
+            if (startDate && endDate) {
+                query.startTimestamp = {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate)
+                };
+            }
+            ;
+            if (date) {
+                query.date = date;
+            }
+            ;
+            if (sentiment) {
+                const sentiments = ["positive", "negative", "neutral", "unknown"];
+                if (!sentiments.includes(sentiment)) {
+                    return res.status(400).json({ error: "Invalid sentiment" });
+                }
+                ;
+                query.userSentiment = sentiment;
+            }
+            ;
+            if (status) {
+                query.callStatus = status;
+            }
+            ;
+            if (tag) {
+                const leadsWithTag = await contact_model_1.contactModel.find({ tag, callId: { $exists: true, $ne: "" } }).select("callId").lean();
+                const callIds = leadsWithTag.map((lead) => lead.callId);
+                if (!callIds || callIds.length === 0) {
+                    return res.status(200).json({
+                        result: [],
+                        message: "No history found for the given tag"
+                    });
+                }
+                ;
+                query.callId = { $in: callIds };
+            }
+            ;
+            if (contact) {
+                const leadContacts = await contact_model_1.contactModel.find({
+                    $or: [
+                        {
+                            firstname: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            lastname: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            email: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            phone: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        }
+                    ],
+                    callId: {
+                        $exists: true,
+                        $ne: ""
+                    }
+                }).select("callId").lean();
+                const callIds = leadContacts.map((lead) => lead.callId);
+                if (!callIds || callIds.length === 0) {
+                    return res.status(200).json({
+                        result: [],
+                        message: "No history found for the given contact"
+                    });
+                }
+                ;
+                query.callId = { $in: callIds };
+            }
+            ;
+            if (disconnectionReason) {
+                const reasons = ["user_hangup", "agent_hangup", "dial_failed", "dial_no_answer", "inactivity", "call_transfer", "voicemail_reached", "machine_detected", "max_duration_reached", "concurrency_limit_reached", "dial_busy", "error"];
+                if (!reasons.includes(disconnectionReason)) {
+                    return res.status(400).json({ error: "Invalid disconnection reason" });
+                }
+                ;
+                if (disconnectionReason === "error") {
+                    const errors = ["error_inbound_webhook", "error_llm_websocket_open", "error_llm_websocket_lost_connection", "error_llm_websocket_runtime", "error_llm_websocket_corrupt_payload", "error_frontend_corrupted_payload", "error_twilio", "error_no_audio_received", "error_asr", "error_retell", "error_unknown", "error_user_not_joined"];
+                    query.disconnectionReason = { $in: errors };
+                }
+                else {
+                    query.disconnectionReason = disconnectionReason;
+                }
+                ;
+            }
+            ;
+            if (callType) {
+                const callTypes = ["web_call", "phone_call"];
+                if (!callTypes.includes(callType)) {
+                    return res.status(400).json({ error: "Invalid call type" });
+                }
+                ;
+                query.callType = callType;
+            }
+            ;
+            if (callOutcome) {
+                if (callOutcome) {
+                    const validOutcomes = Object.values(types_1.calloutcome);
+                    if (!validOutcomes.includes(callOutcome)) {
+                        return res.status(400).json({ error: "Invalid call outcome" });
+                    }
+                    ;
+                    query.call_outcome = callOutcome;
+                }
+                ;
+            }
+            ;
+            if (direction) {
+                const directions = ["inbound", "outbound"];
+                if (!directions.includes(direction)) {
+                    return res.status(400).json({ error: "Invalid call direction" });
+                }
+                ;
+                query.direction = direction;
+            }
+            console.log("query: ", query);
+            const callHistory = await historyModel_1.default
+                .find(query)
+                .sort({ startTimestamp: -1 })
+                .skip(skip)
+                .limit(pageSize)
+                .lean();
+            if (!callHistory || callHistory.length === 0) {
+                return res.status(200).json({
+                    message: "No Call history found"
+                });
+            }
+            ;
+            const callHistories = await Promise.all(callHistory.map(async (history) => {
+                const lead = await contact_model_1.contactModel.findOne({ callId: history.callId }).lean();
+                const calledTimes = (lead === null || lead === void 0 ? void 0 : lead.calledTimes) || 0;
+                const lastCalled = (lead === null || lead === void 0 ? void 0 : lead.datesCalled[0]) || "";
+                const timestamp = history.startTimestamp || 0;
+                const time = luxon_1.DateTime.fromMillis(timestamp).toFormat('MM/dd/yyyy HH:mm');
+                const formattedDuration = history.durationMs ? (() => {
+                    const durationParts = typeof (history === null || history === void 0 ? void 0 : history.durationMs) === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
+                    return `${durationParts[1]}:${durationParts[2]}`;
+                })() : "00:00";
+                const tagToDisplay = lead.tag ? lead.tag.toLowerCase() : "";
+                return {
+                    callId: history.callId || "",
+                    firstName: history.userFirstname || "",
+                    lastName: history.userLastname || "",
+                    email: history.userEmail || "",
+                    phone: history.toNumber || "",
+                    agentId: history.agentId || "",
+                    duration: formattedDuration || "",
+                    status: history.callStatus || "",
+                    dial_status: history.dial_status || "",
+                    transcript: history.transcript || "",
+                    sentiment: history.userSentiment || "",
+                    timestamp: history.endTimestamp || "",
+                    summary: history.callSummary || "",
+                    recording: history.recordingUrl || "",
+                    address: history.address || "",
+                    callAttempts: calledTimes || 0, // Add the calledTimes field
+                    lastCalled,
+                    time,
+                    callType: history.callType || "",
+                    disconnectionReason: history.disconnectionReason || "",
+                    direction: history.direction || "",
+                    callOutcome: history.call_outcome || "",
+                    notes: history.notes || "",
+                    tag: tagToDisplay || "",
+                };
+            }));
+            const totalRecords = await historyModel_1.default.countDocuments(query);
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            if (page > totalPages) {
+                return res.status(400).json({
+                    error: "Page exceeds available data"
+                });
+            }
+            ;
+            return res.status(200).json({
+                callHistories,
+                totalRecords,
+                totalPages,
+                page
+            });
+        }
+        catch (error) {
+            console.error("Error fetching call history: ", error);
+            next(error);
+        }
+        ;
+    }
+    ;
+    async upload_csv(req, res, next) {
+        try {
+            if (!req.file)
+                return res.status(500).json({ message: "No file found" });
+            const body = req.body;
+            const { error } = client_1.UploadCSVSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const csvFile = req.file;
+            const { agentId, tag } = body;
+            const lowerCaseTag = typeof tag === "string" ? tag.toLowerCase() : "";
+            const requiredHeaders = ["firstname", "lastname", "phone", "email"];
+            const uniqueRecordsMap = new Map();
+            const failedContacts = [];
+            const duplicateKeys = new Set();
+            fs_1.default.createReadStream(csvFile.path)
+                .pipe((0, csv_parser_1.default)())
+                .on("headers", (headers) => {
+                const missing_headers = requiredHeaders.filter((header) => !headers.includes(header.trim().toLowerCase()));
+                if (missing_headers.length > 0)
+                    return res.status(100).json({
+                        message: "CSV must contain the followin headers; firstname, lastname, phone, and email"
+                    });
+            })
+                .on("data", (row) => {
+                const { firstname, lastname, email, phone, address } = row;
+                if (firstname && phone) {
+                    const formattedPhone = (0, formatter_1.formatPhoneNumber)(phone);
+                    if (uniqueRecordsMap.has(formattedPhone)) {
+                        duplicateKeys.add(formattedPhone);
+                        failedContacts.push({ row, reason: "duplicate" });
+                    }
+                    else {
+                        uniqueRecordsMap.set(formattedPhone, {
+                            firstname,
+                            lastname,
+                            phone: formattedPhone,
+                            email,
+                            address: address || ""
+                        });
+                    }
+                    ;
+                }
+                else {
+                    failedContacts.push({ row, reason: "missing required fields" });
+                }
+                ;
+            })
+                .on("end", async () => {
+                const uniqueUsersToInsert = Array.from(uniqueRecordsMap.values()).filter((user) => !duplicateKeys.has(user.phone));
+                const dncList = [""];
+                const usersWithAgentId = uniqueUsersToInsert.map((user) => (Object.assign(Object.assign({}, user), { agentId: agentId, tag: lowerCaseTag, isOnDNCList: dncList.includes(user.phone) })));
+                const phoneNumbersToCheck = usersWithAgentId.map((user) => user.phone);
+                const existingUsers = await contact_model_1.contactModel.find({
+                    isDeleted: false,
+                    phone: { $in: phoneNumbersToCheck },
+                });
+                const dbDuplicates = existingUsers;
+                const existingPhoneNumbers = new Set(existingUsers.map((user) => user.phone));
+                const finalUsersToInsert = usersWithAgentId.filter((user) => !existingPhoneNumbers.has(user.phone) && user.phone);
+                if (finalUsersToInsert.length > 0) {
+                    console.log("Inserting users:", finalUsersToInsert);
+                    await contact_model_1.contactModel.bulkWrite(finalUsersToInsert.map((user) => ({
+                        insertOne: { document: user },
+                    })));
+                    await userModel_1.userModel.updateOne({ "agents.agentId": agentId }, { $addToSet: { "agents.$.tag": lowerCaseTag } });
+                }
+                ;
+                fs_1.default.unlink(csvFile.path, (err) => {
+                    if (err) {
+                        console.error("Unable to delete file: ", err);
+                    }
+                    else {
+                        console.log("Deleted file successfully");
+                    }
+                    ;
+                });
+                res.status(200).json({
+                    message: `Upload successful, contacts uploaded: ${finalUsersToInsert.length}`,
+                    duplicates: dbDuplicates,
+                    failedContacts
+                });
+            })
+                .on("error", (err) => {
+                console.error("Error processing CSV: ", err);
+                res.status(500).json({ message: "Failed to process CSV data" });
+            });
+        }
+        catch (e) {
+            console.error("Error uploading csv file: ", e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async graph_chart(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.DashboardSchema.validate(body, {
+                abortEarly: false
+            });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const dateOption = req.body.dateOption;
+            const { agentIds } = body;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            if (!Object.values(types_1.DateOption).includes(dateOption)) {
+                return res.status(400).json({ error: "Invalid date option" });
+            }
+            ;
+            const selectedDateOption = dateOption;
+            const timeZone = "America/Los_Angeles";
+            const createHourlyTemplate = () => Array.from({ length: 7 }, (_, i) => ({
+                x: `${(9 + i).toString().padStart(2, "0")}:00`,
+                y: 0
+            }));
+            const sumHourlyCalls = (hourlyCalls, start = 9, end = 15) => Array.from(hourlyCalls.entries())
+                .filter(([hour]) => {
+                const hourInt = parseInt(hour.split(":")[0], 10);
+                return hourInt >= start && hourInt < end;
+            })
+                .reduce((sum, [, count]) => sum + count, 0);
+            const getWeekDays = (startDay) => Array.from({ length: 7 }, (_, i) => startDay.minus({ days: i }).toISODate()).reverse();
+            // Fetching data based on DateOption;
+            let response;
+            if (selectedDateOption === types_1.DateOption.Today) {
+                console.log("hello: I am here");
+                const today = luxon_1.DateTime.now().setZone(timeZone).startOf("day").toISODate();
+                const stats = await graphModel_1.dailyGraphModel.find({
+                    agentId: { $in: agentIds },
+                    date: today
+                });
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and day" });
+                }
+                ;
+                const aggregatedCalls = stats.reduce((acc, stat) => {
+                    const hourlyCalls = stat.hourlyCalls;
+                    hourlyCalls.forEach((count, hour) => {
+                        if (!acc[hour])
+                            acc[hour] = 0;
+                        acc[hour] += count;
+                    });
+                    return acc;
+                }, {});
+                response = createHourlyTemplate().map((entry) => (Object.assign(Object.assign({}, entry), { y: aggregatedCalls[entry.x] || 0 })));
+            }
+            else if (selectedDateOption === types_1.DateOption.ThisWeek) {
+                const startDay = luxon_1.DateTime.now().setZone(timeZone).startOf("day");
+                const weekDays = getWeekDays(startDay);
+                const stats = await graphModel_1.dailyGraphModel.find({
+                    agentId: { $in: agentIds },
+                    date: { $in: weekDays }
+                });
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                }
+                ;
+                response = weekDays.map((day) => {
+                    const dayStats = stats.filter((stat) => stat.date === day);
+                    const dailySum = dayStats.reduce((sum, stat) => sum + sumHourlyCalls(stat.hourlyCalls), 0);
+                    const dayName = luxon_1.DateTime.fromISO(day, { zone: timeZone }).toLocaleString({ weekday: "long" });
+                    return { x: dayName, y: dailySum || 0 };
+                });
+            }
+            else if (selectedDateOption === types_1.DateOption.ThisMonth) {
+                const stats = await graphModel_1.dailyGraphModel.find({ agentId: { $in: agentIds } });
+                console.log("month: ", stats);
+                if (stats.length === 0) {
+                    return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                }
+                ;
+                response = Array.from({ length: 12 }, (_, i) => {
+                    const monthStats = stats.filter((stat) => luxon_1.DateTime.fromISO(stat.date).month === i + 1);
+                    const monthlySum = monthStats.reduce((sum, stat) => sum + sumHourlyCalls(stat.hourlyCalls), 0);
+                    const monthName = luxon_1.DateTime.fromObject({ month: i + 1 }).toLocaleString({ month: "long" });
+                    return { x: monthName, y: monthlySum };
+                });
+            }
+            else if (selectedDateOption === types_1.DateOption.LAST_SCHEDULE) {
+                const lastStat = await graphModel_1.dailyGraphModel
+                    .findOne({ agentId: { $in: agentIds } })
+                    .sort({ date: -1 });
+                if (!lastStat) {
+                    response = createHourlyTemplate();
+                }
+                else {
+                    const stats = await graphModel_1.dailyGraphModel.find({
+                        agentId: { $in: agentIds },
+                        date: lastStat.date,
+                    });
+                    if (stats.length === 0) {
+                        return res.status(404).json({ message: "No stats found for the given agents and timeframe" });
+                    }
+                    ;
+                    const aggregatedCalls = stats.reduce((acc, stat) => {
+                        const hourlyCalls = stat.hourlyCalls;
+                        hourlyCalls.forEach((count, hour) => {
+                            if (!acc[hour])
+                                acc[hour] = 0;
+                            acc[hour] += count;
+                        });
+                        return acc;
+                    }, {});
+                    response = createHourlyTemplate().map((entry) => (Object.assign(Object.assign({}, entry), { y: aggregatedCalls[entry.x] || 0 })));
+                }
+                ;
+            }
+            else {
+                return res.status(400).json({ error: "Invalid dateOption" });
+            }
+            ;
+            return res.status(200).json({
+                success: true,
+                response
+            });
+        }
+        catch (e) {
+            console.error("Error fetching client graph" + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async all_campaigns(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const status = req.query.status;
+            const upperCaseStatus = status ? status.toUpperCase() : null;
+            if (status && !Object.values(types_1.CampaignStatus).includes(upperCaseStatus)) {
+                return res.status(400).json({ error: "Invalid campaign status" });
+            }
+            ;
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaigns_result = await axios_1.default.get(url);
+            const campaigns = campaigns_result.data;
+            let result = [];
+            if (status) {
+                const filteredCampaigns = campaigns.filter((campaign) => campaign.status === upperCaseStatus);
+                result = filteredCampaigns;
+            }
+            else {
+                result = campaigns;
+            }
+            ;
+            if (!result)
+                return res.status(400).json({ message: "No campaigns not found" });
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error('Error fetching all campaigns from smart lead: ' + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async single_campaign(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+            if (campaignId === null || campaignId === undefined || !campaignId)
+                return res.status(400).json({ message: "CampaignId is required" });
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.get(url);
+            const result = campaign.data;
+            if (!result)
+                return res.status(400).json({ message: "stats not found" });
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching single campaign from smart-lead: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async single_campaign_stats(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.CampaignStatisticsSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const { campaignId, limit, email_status, startDate, endDate } = body;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const baseUrl = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/statistics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const queryParams = [];
+            if (limit)
+                queryParams.push(`limit=${limit}`);
+            if (email_status)
+                queryParams.push(`email_status=${email_status}`);
+            if (startDate)
+                queryParams.push(`sent_time_start_date=${startDate}`);
+            if (endDate)
+                queryParams.push(`sent_time_end_date=${endDate}`);
+            const url = queryParams.length ? `${baseUrl}&${queryParams.join('&')}` : baseUrl;
+            const campaign = await axios_1.default.get(url);
+            const result = campaign.data;
+            if (!result)
+                return res.status(400).json({ message: "history not found" });
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching single campaign stats from smart lead: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async single_campaign_analytics(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+            if (campaignId === null || campaignId === undefined || !campaignId)
+                return res.status(400).json({ message: "CampaignId is required" });
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.get(url);
+            const result = campaign.data;
+            if (!result)
+                return res.status(400).json({ message: "history not found" });
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching sinle campaign analytics: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async all_campaign_analytics(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const page = req.query.page;
+            const status = req.query.status;
+            const upperCaseStatus = status ? status.toUpperCase() : null;
+            if (status && !Object.values(types_1.CampaignStatus).includes(upperCaseStatus)) {
+                return res.status(400).json({ error: "Invalid campaign status" });
+            }
+            ;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { name } = check_user;
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const clients = await axios_1.default.get(clients_url);
+            const clients_data = clients.data;
+            let foundClient;
+            ;
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client) => client.logo === "Digital Mavericks Media");
+            }
+            else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client) => client.logo === "Cory Warfield");
+            }
+            else if (name === "ClearPath") {
+                foundClient = clients_data.find((client) => client.logo === "ClearPath CFO Advisors");
+            }
+            else {
+                foundClient = clients_data.find((client) => client.logo === name);
+            }
+            ;
+            if (!foundClient)
+                return res.status(400).json({ error: "Client not found in Intuitive Campaigns" });
+            const { id } = foundClient;
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.get(url);
+            const all_campaigns = campaign.data;
+            if (!all_campaigns)
+                return res.status(400).json({ message: "No Analytics not found" });
+            const client_campaigns = all_campaigns.filter((campaign) => campaign.client_id === id);
+            let campaigns = [];
+            if (status) {
+                const filteredCampaigns = client_campaigns.filter((campaign) => campaign.status === upperCaseStatus);
+                campaigns = filteredCampaigns;
+            }
+            else {
+                campaigns = client_campaigns;
+            }
+            ;
+            const limit = 15;
+            const page_to_use = parseInt(page) || 1;
+            const startIndex = (page_to_use - 1) * limit;
+            const endIndex = page_to_use * limit;
+            const totalPages = Math.ceil(campaigns.length / limit);
+            // if (page_to_use > totalPages) {
+            //     return res.status(400).json({
+            //         error: "Page exceeds available data"
+            //     });
+            // };
+            const campaignsToFetch = campaigns.slice(startIndex, endIndex);
+            let result = [];
+            for (const campaign of campaignsToFetch) {
+                const { id } = campaign;
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+                const analytics = await axios_1.default.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                result.push(campaign_analytics);
+            }
+            ;
+            return res.status(200).json({
+                success: true,
+                result,
+                page: page_to_use,
+                totalPages
+            });
+        }
+        catch (e) {
+            console.error("Error fetching all campaign analytics: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async fetch_message_history(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+            const lead_id = req.query.lead_id;
+            const date = req.query.date;
+            if (campaignId === null || campaignId === undefined || !campaignId)
+                return res.status(400).json({ message: "CampaignId is required" });
+            if (lead_id === null || lead_id === undefined || !lead_id)
+                return res.status(400).json({ message: "LeadId is required" });
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            let url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads/${lead_id}/message-history?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            if (date) {
+                url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads/${lead_id}/message-history?api_key=${process.env.SMART_LEAD_API_KEY}&event_time_gt=${date}`;
+            }
+            ;
+            const campaign = await axios_1.default.get(url);
+            const result = campaign.data;
+            if (!result)
+                return res.status(400).json({ message: "history not found" });
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching message history from Intuitive Campaign: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async forward_email(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.ForwardReplySchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { campaignId, message_id, stats_id, to_emails } = body;
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/forward-email?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.post(url, {
+                message_id,
+                stats_id,
+                to_emails
+            });
+            console.log("campa: ", campaign);
+            const result = campaign.data;
+            console.log("result: ", result);
+            if (!result)
+                return res.status(400).json({ message: "unable to forward message" });
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error forwarding reply via Intuitive campaign: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async list_leads(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.query.campaignId;
+            if (campaignId === null || campaignId === undefined || !campaignId)
+                return res.status(400).json({ message: "CampaignId is required" });
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/leads?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.get(url);
+            const result = campaign.data;
+            if (!result)
+                return res.status(400).json({ message: "No leads found" });
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching list of leads: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async reply_lead(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.ReplyLeadSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { campaignId, email_body, reply_message_id, reply_email_time, reply_email_body, cc, bcc, add_signature, to_first_name, to_last_name, to_email } = body;
+            const body_to_send = Object.entries({
+                email_body,
+                reply_message_id,
+                reply_email_time,
+                reply_email_body,
+                cc,
+                bcc,
+                add_signature,
+                to_first_name,
+                to_last_name,
+                to_email
+            }).reduce((acc, [key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    acc[key] = value;
+                }
+                return acc;
+            }, {});
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/reply-email-thread?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.post(url, body_to_send);
+            const result = campaign.data;
+            console.log("result: ", result);
+            if (result.ok !== "true")
+                return res.status(400).json({ message: "unable to reply to lead" });
+            // return res.status(200).json({
+            //     success: true,
+            //     result
+            // });
+            const update_reply = await emailReply_1.ReplyModel.updateOne({
+                campaign_id: campaignId,
+                message_id: reply_message_id,
+                replied_to: false
+            }, { replied_to: true });
+            if (!update_reply.acknowledged) {
+                return res.status(200).json({
+                    success: true,
+                    result
+                });
+            }
+            else {
+                return res.status(200).json({
+                    success: true,
+                    message: "Reply made but Unable to update replied_to status in db",
+                    result
+                });
+            }
+        }
+        catch (e) {
+            console.error("Error replying email lead: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async campaign_dashboard(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { name } = check_user;
+            const body = req.body;
+            const { error } = client_1.CampaignDashboardSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            let start;
+            let end;
+            const { startDate, endDate, total, date } = body;
+            if ((date && (startDate || endDate)) || (date && total)) {
+                return res.status(400).json({ error: "date cannot be used with startDate or endDate or total" });
+            }
+            ;
+            if ((startDate && !endDate) || (!startDate && endDate)) {
+                return res.status(400).json({ error: "startDate and endDate must be passed together" });
+            }
+            ;
+            if (total && (startDate || endDate)) {
+                return res.status(400).json({ error: "total cannot be used with startDate or endDate" });
+            }
+            ;
+            if (total === false && (!startDate || !endDate)) {
+                return res.status(400).json({ error: "startDate and endDate are required when total is false" });
+            }
+            ;
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = (0, date_fns_tz_1.toZonedTime)(now, timeZone);
+            if (total === true) {
+                start = "2024-01-01";
+                end = zonedNow.toISOString().split("T")[0];
+            }
+            else if (date) {
+                start = date;
+                end = date;
+            }
+            else if (startDate && endDate) {
+                start = startDate;
+                end = endDate;
+            }
+            ;
+            // console.log("start: ", start);
+            // console.log("end: ", end);
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const clients = await axios_1.default.get(clients_url);
+            const clients_data = clients.data;
+            let foundClient;
+            ;
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client) => client.logo === "Digital Mavericks Media");
+            }
+            else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client) => client.logo === "Cory Warfield");
+            }
+            else if (name === "ClearPath") {
+                foundClient = clients_data.find((client) => client.logo === "ClearPath CFO Advisors");
+            }
+            else {
+                foundClient = clients_data.find((client) => client.logo === name);
+            }
+            ;
+            if (!foundClient)
+                return res.status(400).json({ error: "Client not found in Intuitive Campaign" });
+            const { id } = foundClient;
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.get(url);
+            const all_campaigns = campaign.data;
+            if (!all_campaigns)
+                return res.status(400).json({ message: "No Analytics not found" });
+            const client_campaigns = all_campaigns.filter((campaign) => campaign.client_id === id);
+            let result = [];
+            for (const campaign of client_campaigns) {
+                const { id } = campaign;
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
+                const analytics = await axios_1.default.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                // console.log("campaign_analytics: ", campaign_analytics);
+                const campaign_details = campaign_analytics.data[0];
+                if (campaign_details) {
+                    result.push(campaign_details);
+                }
+                ;
+            }
+            ;
+            for (const campaign of client_campaigns) {
+                const { id } = campaign;
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+                const analytics = await axios_1.default.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                if (campaign_analytics) {
+                    result.push(campaign_analytics);
+                }
+                ;
+                // console.log("campaign_analytics: ", campaign_analytics);
+            }
+            ;
+            ;
+            // interface CampaignObject {
+            //     email_campaign_seq_id: number,
+            //     sent_count: string,
+            //     skipped_count: string,
+            //     open_count: string,
+            //     click_count: string,
+            //     reply_count: string,
+            //     bounce_count: string,
+            //     unsubscribed_count: string,
+            //     failed_count: string,
+            //     stopped_count: string,
+            //     ln_connection_req_pending_count: string,
+            //     ln_connection_req_accepted_count: string,
+            //     ln_connection_req_skipped_sent_msg_count: string,
+            //     positive_reply_count: string
+            // };
+            const summedValues = {};
+            const parent_keys = ["sent_count", "open_count", "click_count", "reply_count", "bounce_count"];
+            const stat_keys = ["interested", "total"];
+            parent_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+            stat_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+            result.forEach((campaign) => {
+                parent_keys.forEach((key) => {
+                    summedValues[key] += parseInt(campaign[key]) || 0;
+                });
+                stat_keys.forEach((key) => {
+                    var _a;
+                    summedValues[key] += ((_a = campaign.campaign_lead_stats) === null || _a === void 0 ? void 0 : _a[key]) || 0;
+                });
+            });
+            const dashboard = {
+                total_sent: summedValues.sent_count,
+                replied: summedValues.reply_count,
+                opened: summedValues.open_count,
+                clicked: summedValues.click_count,
+                positive_reply: summedValues.interested,
+                bounced: summedValues.bounce_count,
+                contacts: summedValues.total
+            };
+            return res.status(200).json({
+                success: true,
+                result: Object.assign({}, dashboard)
+            });
+        }
+        catch (e) {
+            console.error("Error fetching campaign dashboard: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async campaign_overview(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { name } = check_user;
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const clients = await axios_1.default.get(clients_url);
+            const clients_data = clients.data;
+            let foundClient;
+            ;
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client) => client.logo === "Digital Mavericks Media");
+            }
+            else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client) => client.logo === "Cory Warfield");
+            }
+            else if (name === "ClearPath") {
+                foundClient = clients_data.find((client) => client.logo === "ClearPath CFO Advisors");
+            }
+            else {
+                foundClient = clients_data.find((client) => client.logo === name);
+            }
+            ;
+            if (!foundClient)
+                return res.status(400).json({ error: "Client not found in Intuitive Campaigns" });
+            const { id } = foundClient;
+            const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const campaign = await axios_1.default.get(url);
+            const all_campaigns = campaign.data;
+            if (!all_campaigns)
+                return res.status(400).json({ message: "No Analytics not found" });
+            const client_campaigns = all_campaigns.filter((campaign) => campaign.client_id === id);
+            let result = [];
+            for (const campaign of client_campaigns) {
+                const { id } = campaign;
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+                const analytics = await axios_1.default.get(analyticsUrl);
+                const campaign_analytics = analytics.data;
+                result.push(campaign_analytics);
+            }
+            ;
+            ;
+            const summedValues = {};
+            const parent_keys = ["sent_count", "reply_count", "bounce_count"];
+            const stat_keys = ["total", "interested"];
+            parent_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+            stat_keys.forEach((key) => {
+                summedValues[key] = 0;
+            });
+            result.forEach((campaign) => {
+                parent_keys.forEach((key) => {
+                    summedValues[key] += parseInt(campaign[key]) || 0;
+                });
+                stat_keys.forEach((key) => {
+                    summedValues[key] += campaign.campaign_lead_stats[key] || 0;
+                });
+            });
+            const bounce = (summedValues.bounce_count / summedValues.total) * 100;
+            const bounce_rate = bounce.toFixed(2) + "%";
+            const overview = {
+                emails_sent: summedValues.sent_count,
+                replies: summedValues.reply_count,
+                positive_responses: summedValues.interested,
+                bounces: summedValues.bounce_count,
+                total_contacts: summedValues.total,
+                bounce_rate
+            };
+            return res.status(200).json({
+                success: true,
+                result: Object.assign({}, overview)
+            });
+        }
+        catch (e) {
+            console.error("Error fetching campaign overview: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async add_webhook(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.AddWebhookSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { campaignId, name, webhook_url, event_types, categories } = body;
+            const body_to_send = {
+                id: null,
+                name,
+                webhook_url,
+                event_types,
+                categories
+            };
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/webhooks?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const webhook = await axios_1.default.post(url, body_to_send);
+            const response = webhook.data;
+            if (response.ok !== true)
+                return res.status(400).json({ message: "unable to add webhook" });
+            return res.status(200).json({
+                success: true,
+                result: response
+            });
+        }
+        catch (e) {
+            console.error("Error adding webhook: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async email_sent_webhook(req, res, next) {
+        try {
+            const body = req.body;
+            console.log("email sent webhook: ", body);
+            const log = new webhook_1.WebhookModel(body);
+            await log.save();
+            return res.status(200).json({
+                success: true,
+                message: "email sent webhook received",
+            });
+        }
+        catch (e) {
+            console.error("Error receiving email sent webhook: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async fetch_agent_data(req, res, next) {
+        var _a, _b, _c, _d, _e, _f, _g;
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.AgentDataSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { agentId } = body;
+            const dateOption = req.body.dateOption;
+            let date_filter = {};
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = (0, date_fns_tz_1.toZonedTime)(now, timeZone);
+            const today = (0, date_fns_tz_1.format)(zonedNow, "yyyy-MM-dd", { timeZone });
+            const cur_now = luxon_1.DateTime.now().setZone("America/Los_Angeles");
+            const totalContacts = await contact_model_1.contactModel.countDocuments({
+                agentId,
+                isDeleted: false
+            });
+            const totalNotCalled = await contact_model_1.contactModel.countDocuments({
+                agentId,
+                isDeleted: false,
+                dial_status: types_1.callstatusenum.NOT_CALLED
+            });
+            switch (dateOption) {
+                case types_1.DateOption.Today:
+                    date_filter = { day: today };
+                    break;
+                case types_1.DateOption.Yesterday:
+                    const yest_zone = (0, date_fns_tz_1.toZonedTime)((0, date_fns_1.subDays)(now, 1), timeZone);
+                    const yesterday = (0, date_fns_tz_1.format)(yest_zone, "yyyy-MM-dd", { timeZone });
+                    date_filter = { day: yesterday };
+                    break;
+                case types_1.DateOption.ThisWeek:
+                    const weekdays = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = (0, date_fns_1.subDays)(zonedNow, i);
+                        const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                        weekdays.push(valid_day);
+                    }
+                    date_filter = { day: { $in: weekdays } };
+                    break;
+                case types_1.DateOption.ThisMonth:
+                    const startOfMonth = cur_now.startOf("month");
+                    const todayDate = cur_now.startOf("day");
+                    const monthDates = [];
+                    let currentDate = startOfMonth;
+                    while (currentDate <= todayDate) {
+                        monthDates.push(currentDate.toFormat("yyyy-MM-dd"));
+                        currentDate = currentDate.plus({ days: 1 });
+                    }
+                    ;
+                    date_filter = { day: { $in: monthDates } };
+                    break;
+                case types_1.DateOption.PastMonth:
+                    const startDate = cur_now.minus({ days: 30 }).startOf("day");
+                    const pastMonthDates = [];
+                    let currentDatePast = startDate;
+                    while (currentDatePast <= cur_now.startOf("day")) {
+                        pastMonthDates.push(currentDatePast.toFormat("yyyy-MM-dd"));
+                        currentDatePast = currentDatePast.plus({ days: 1 });
+                    }
+                    ;
+                    date_filter = { day: { $in: pastMonthDates } };
+                    break;
+                case types_1.DateOption.Total:
+                    date_filter = {};
+                    break;
+                case types_1.DateOption.LAST_SCHEDULE:
+                    const recentJob = await contact_model_1.jobModel
+                        .findOne({ agentId })
+                        .sort({ createdAt: -1 })
+                        .lean();
+                    if (recentJob) {
+                        const dateToCheck = recentJob.scheduledTime.split("T")[0];
+                        date_filter = { day: dateToCheck };
+                    }
+                    else {
+                        date_filter = {};
+                    }
+                    ;
+                    break;
+            }
+            ;
+            const stats = await logModel_1.DailyStatsModel.aggregate([
+                {
+                    $match: Object.assign({ agentId }, date_filter)
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCalls: { $sum: "$totalCalls" },
+                        totalAnsweredByVm: { $sum: "$totalAnsweredByVm" },
+                        totalAppointment: { $sum: "$totalAppointment" },
+                        totalCallsTransffered: { $sum: "$totalTransffered" },
+                        totalFailedCalls: { $sum: "$totalFailed" },
+                        totalAnsweredCalls: { $sum: "$totalCallAnswered" },
+                        totalDialNoAnswer: { $sum: "$totalDialNoAnswer" },
+                        totalAnsweredByIVR: { $sum: "$totalAnsweredByIVR" },
+                        totalCallInactivity: { $sum: "$totalCallInactivity" },
+                        totalCallDuration: { $sum: "$totalCallDuration" },
+                    }
+                }
+            ]);
+            function convertMillisecondsToTime(milliseconds) {
+                const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+                const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+                const formattedHours = String(hours).padStart(2, '0');
+                const formattedMinutes = String(minutes).padStart(2, '0');
+                const formattedSeconds = String(seconds).padStart(2, '0');
+                return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+            }
+            ;
+            const milliseconds = ((_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalCallDuration) || 0;
+            const combinedCallDuration = convertMillisecondsToTime(milliseconds);
+            const result = {
+                totalContacts,
+                totalCalls: ((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCalls) || 0,
+                totalNotCalled,
+                totalAnsweredByVm: ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalAnsweredByVm) || 0,
+                totalFailedCalls: ((_d = stats[0]) === null || _d === void 0 ? void 0 : _d.totalFailedCalls) || 0,
+                totalAnsweredCalls: ((_e = stats[0]) === null || _e === void 0 ? void 0 : _e.totalAnsweredCalls) || 0,
+                totalCallsTransferred: ((_f = stats[0]) === null || _f === void 0 ? void 0 : _f.totalCallsTransffered) || 0,
+                totalCallsDuration: combinedCallDuration,
+                totalAppointments: ((_g = stats[0]) === null || _g === void 0 ? void 0 : _g.totalAppointment) || 0
+            };
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching single agent stats" + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async schedule_details(req, res, next) {
+        var _a, _b, _c;
+        try {
+            const clientId = req.user._id;
+            const agentId = req.query.agentId;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const recent_schedule = await contact_model_1.jobModel
+                .findOne({ agentId })
+                .sort({ createdAt: -1 })
+                .lean();
+            if (!recent_schedule)
+                return res.status(400).json({ message: "No schedule found" });
+            const { scheduledTime, tagProcessedFor } = recent_schedule;
+            const dateToCheck = scheduledTime.split("T")[0];
+            const startDate = `${dateToCheck}T00:00:00.000`;
+            const endDate = `${dateToCheck}T23:59:59.999`;
+            const schedules = await contact_model_1.jobModel.find({
+                agentId,
+                scheduledTime: {
+                    $gte: startDate,
+                    $lte: endDate
+                },
+                callstatus: { $in: ["Calling", "Called"] }
+            });
+            let allContactsToProcess = 0;
+            let allCompletedPercent = 0;
+            let allProcessedContacts = 0;
+            console.log("sched: ", schedules);
+            for (const schedule of schedules) {
+                console.log("schedule: ", schedule);
+                const totalContactToProcess = (_a = schedule.totalContactToProcess) !== null && _a !== void 0 ? _a : 0;
+                const completedPercent = schedule.completedPercent || "0";
+                const processedContacts = schedule.processedContacts || 0;
+                allContactsToProcess += totalContactToProcess;
+                allCompletedPercent += parseInt(completedPercent);
+                allProcessedContacts += processedContacts;
+            }
+            ;
+            const contactsRemaining = allContactsToProcess - allProcessedContacts || 0;
+            const completedPercent = allCompletedPercent / schedules.length;
+            const stats = await logModel_1.DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId,
+                        day: dateToCheck
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCalls: { $sum: "$totalCalls" },
+                        totalAppointments: { $sum: "$totalAppointment" }
+                    }
+                }
+            ]);
+            const calls = ((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCalls) || 0;
+            const bookings = ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalAppointments) || 0;
+            const result = {
+                name: tagProcessedFor,
+                contacts: allContactsToProcess,
+                calls,
+                bookings,
+                scheduleProgress: Math.ceil(Number(completedPercent)),
+                contactsRemaining,
+                contactsDone: allProcessedContacts,
+            };
+            return res.status(200).json(Object.assign({ success: true }, result));
+        }
+        catch (e) {
+            console.error("Error fetching schedule details: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async email_reply_webhook(request, response) {
+        try {
+            const body = request.body[0];
+            console.log("email reply webhook: ", body);
+            const clientId = body.clientId;
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const clients = await axios_1.default.get(clients_url);
+            const clients_data = clients.data;
+            ;
+            const foundClient = clients_data.find((client) => client.id === clientId);
+            if (!foundClient) {
+                console.error("Could not find client");
+            }
+            ;
+            const client_name = foundClient.logo;
+            let client;
+            if (client_name === "Digital Mavericks Media") {
+                const client_details = await userModel_1.userModel.findOne({ name: client_name }).select("-password -passwordHash");
+                client = client_details._id;
+            }
+            else if (client_name === "Cory Warfield") {
+                const client_details = await userModel_1.userModel.findOne({ name: "Cory Lopez-Warfield" }).select("-password -passwordHash");
+                client = client_details._id;
+            }
+            else if (client_name === "ClearPath CFO Advisors") {
+                const client_details = await userModel_1.userModel.findOne({ name: "ClearPath" }).select("-password -passwordHash");
+                client = client_details._id;
+            }
+            else {
+                const client_details = await userModel_1.userModel.findOne({ name: client_name }).select("-password -passwordHash");
+                client = client_details._id;
+            }
+            ;
+            const new_reply = await emailReply_1.ReplyModel.create(Object.assign({ client }, body));
+            if (!new_reply._id) {
+                console.error("Error creating new reply");
+            }
+            ;
+        }
+        catch (e) {
+            console.error("Error receiving email sent webhook: " + e);
+        }
+        ;
+    }
+    ;
+    async fetch_replies(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.FetchRepliesSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const page = parseInt(req.body.page) || 1;
+            const campaign_id = req.body.campaignId;
+            const category = req.body.category;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { name } = check_user;
+            // const { cam}
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const clients = await axios_1.default.get(clients_url);
+            const clients_data = clients.data;
+            let foundClient;
+            let query = {};
+            ;
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client) => client.logo === "Digital Mavericks Media");
+            }
+            else if (name === "ClearPath") {
+                foundClient = clients_data.find((client) => client.logo === "ClearPath CFO Advisors");
+            }
+            else {
+                foundClient = clients_data.find((client) => client.logo === name);
+            }
+            ;
+            if (!foundClient)
+                return res.status(400).json({ error: "Client not found in Intuitive Campaigns" });
+            const { id } = foundClient;
+            const limit = 50;
+            const skip = (page - 1) * limit;
+            query.client_id = id;
+            if (campaign_id) {
+                query.campaign_id = campaign_id;
+            }
+            ;
+            if (category) {
+                query.reply_category = { $in: category };
+            }
+            ;
+            console.log("query: ", query);
+            const totalRecords = await emailReply_1.ReplyModel.countDocuments(query);
+            const totalPages = Math.ceil(totalRecords / limit);
+            if (totalRecords < 1) {
+                return res.status(200).json({ result: [] });
+            }
+            ;
+            if (page > totalPages) {
+                return res.status(400).json({
+                    error: "Page exceeds available data"
+                });
+            }
+            ;
+            const replies = await emailReply_1.ReplyModel
+                .find(query)
+                .sort({ event_timestamp: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean();
+            return res.status(200).json({
+                success: true,
+                result: replies,
+                page,
+                totalPages,
+                totalRecords
+            });
+        }
+        catch (e) {
+            console.error("Error fetching replies: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async update_agent(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.UpdateAgentIdSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "Client not found" });
+            const { agentId, newAgentId } = body;
+            const check_agent = await userModel_1.userModel.findOne({ "agents.agentId": agentId });
+            if (!check_agent)
+                return res.status(400).json({ message: "AgentId to replace not found" });
+            let successUpdates = [];
+            let failedUpdates = [];
+            const user = await userModel_1.userModel.updateOne({ "agents.agentId": agentId }, { $set: {
+                    'agents.$.agentId': newAgentId
+                }
+            });
+            if (user.acknowledged) {
+                successUpdates.push("user");
+            }
+            else {
+                failedUpdates.push("user");
+            }
+            ;
+            const retell = await contact_model_1.contactModel.updateMany({ agentId }, {
+                $set: {
+                    agentId: newAgentId
+                }
+            });
+            if (retell.acknowledged) {
+                successUpdates.push("contacts");
+            }
+            else {
+                failedUpdates.push("contacts");
+            }
+            ;
+            const transcript = await contact_model_1.EventModel.updateMany({ agentId }, {
+                $set: {
+                    agentId: newAgentId
+                }
+            });
+            if (transcript.acknowledged) {
+                successUpdates.push("transcripts");
+            }
+            else {
+                failedUpdates.push("transcripts");
+            }
+            ;
+            const job = await contact_model_1.jobModel.updateMany({ agentId }, {
+                $set: {
+                    agentId: newAgentId
+                }
+            });
+            if (job.acknowledged) {
+                successUpdates.push("job");
+            }
+            else {
+                failedUpdates.push("job");
+            }
+            ;
+            const graph = await graphModel_1.dailyGraphModel.updateMany({ agentId }, {
+                $set: {
+                    agentId: newAgentId
+                }
+            });
+            if (graph.acknowledged) {
+                successUpdates.push("graph");
+            }
+            else {
+                failedUpdates.push("graph");
+            }
+            ;
+            const daily = await logModel_1.DailyStatsModel.updateMany({ agentId }, {
+                $set: {
+                    agentId: newAgentId
+                }
+            });
+            if (daily.acknowledged) {
+                successUpdates.push("daily");
+            }
+            else {
+                failedUpdates.push("daily");
+            }
+            ;
+            const history = await historyModel_1.default.updateMany({ agentId }, {
+                $set: {
+                    agentId: newAgentId
+                }
+            });
+            if (history.acknowledged) {
+                successUpdates.push("history");
+            }
+            else {
+                failedUpdates.push("history");
+            }
+            ;
+            return res.status(200).json({
+                successUpdates,
+                failedUpdates
+            });
+        }
+        catch (e) {
+            console.error("Error updating agent" + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async minutes_used(req, res, next) {
+        var _a;
+        try {
+            const clientId = req.user._id;
+            // const username = req.query.username as string;
+            // const new_password = req.query.new_password as string;
+            // console.log("user: ", username);
+            // console.log("pass: ", new_password);
+            // const new_hash = await argon2.hash(new_password);
+            // const update = await userModel.updateOne(
+            //     { username },
+            //     {
+            //         password: new_password,
+            //         passwordHash: new_hash
+            //     }
+            // );
+            // console.log("update: ", update);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = (0, date_fns_tz_1.toZonedTime)(now, timeZone);
+            const today = (0, date_fns_tz_1.format)(zonedNow, "yyyy-MM-dd", { timeZone });
+            const monthDates = [];
+            for (let i = 0; i < now.getDate(); i++) {
+                const day = (0, date_fns_1.subDays)(now, i);
+                const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                monthDates.unshift(valid_day);
+            }
+            ;
+            const { agents } = check_user;
+            const agentId = agents[0].agentId;
+            const stats = await logModel_1.DailyStatsModel.aggregate([
+                {
+                    $match: {
+                        agentId: agentId,
+                        day: {
+                            $in: monthDates
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalCallDuration: {
+                            $sum: "$totalCallDuration"
+                        }
+                    }
+                }
+            ]);
+            function convertMsToMinSec(ms) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                // return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+                return `${String(minutes).padStart(2, "0")}`;
+            }
+            ;
+            const minutesUsed = convertMsToMinSec(((_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalCallDuration) || 0);
+            return res.status(200).json({
+                success: true,
+                minutesUsed
+            });
+        }
+        catch (e) {
+            console.error("Error fetching minutes used: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async trigger_lead_calls(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { name } = check_user;
+            const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+            const clients = await axios_1.default.get(clients_url);
+            const clients_data = clients.data;
+            let foundClient;
+            ;
+            if (name === "Legacy Alliance Club") {
+                foundClient = clients_data.find((client) => client.logo === "Digital Mavericks Media");
+            }
+            else if (name === "Cory Lopez-Warfield") {
+                foundClient = clients_data.find((client) => client.logo === "Cory Warfield");
+            }
+            else {
+                foundClient = clients_data.find((client) => client.logo === name);
+            }
+            if (!foundClient)
+                return res.status(400).json({ error: "Client not found in Intuitive Campaigns" });
+            const { id } = foundClient;
+            console.log("client id: ", id);
+            const leads_to_call = await emailReply_1.ReplyModel.find({
+                client_id: id,
+                is_meeting_request: true,
+                phone: {
+                    $exists: true,
+                    $ne: ""
+                }
+            });
+            console.log("leads to call: ", leads_to_call);
+            if (leads_to_call.length < 1)
+                return res.status(200).json({ message: "No leads to call" });
+            this.call_leads(leads_to_call);
+            return res.status(200).json({
+                success: true,
+                message: "Lead calls triggered"
+            });
+        }
+        catch (e) {
+            console.error("Error triggering lead calls: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async call_leads(leads) {
+        console.log("inside call leads");
+    }
+    ;
+    async sentiment_correction_script(req, res, next) {
+        try {
+            const body = req.body;
+            const { error } = client_1.ContactsSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const { contacts } = body;
+            for (const contact of contacts) {
+                const fetch_contact = await contact_model_1.contactModel.findOne({ _id: contact })
+                    .populate("referenceToCallId");
+                if (!fetch_contact)
+                    return res.status(400).json({ message: `contact ${contact} not found` });
+                const { referenceToCallId, callId } = fetch_contact;
+                const { _id, transcript } = referenceToCallId;
+                const review = await (0, transcript_review_1.reviewTranscript)(transcript);
+                const sentiment = review.message.content;
+                const result = await contact_model_1.EventModel.updateOne({ _id }, {
+                    userSentiment: sentiment,
+                    analyzedTranscript: sentiment
+                });
+                await historyModel_1.default.updateOne({ callId }, {
+                    userSentiment: sentiment
+                });
+                if (!result.acknowledged)
+                    return res.status(400).json({ message: `unable to update sentiment for contact ${contact}` });
+            }
+            ;
+            return res.status(200).json({
+                success: true,
+                message: "sentiments updated for contacts"
+            });
+        }
+        catch (e) {
+            console.error("Error correcting sentiment: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async edit_profile(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.EditProfileSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { username, password, email, group, name, agent } = body;
+            let data_to_update = {};
+            if (password) {
+                const new_hash = await argon2_1.default.hash(password);
+                data_to_update = {
+                    password,
+                    passwordHash: new_hash
+                };
+            }
+            ;
+            if (agent) {
+                // const existingAgentIndex = check_user.agents.findIndex((a: any) => a.agentId === agent.agentId);
+                // if (existingAgentIndex !== -1) {
+                //     check_user.agents[existingAgentIndex] = agent;
+                // } else {
+                //     check_user.agents.push(agent);
+                // }
+                data_to_update = Object.assign(Object.assign({}, data_to_update), { "agents.0.agentId": agent });
+            }
+            ;
+            if (email) {
+                const check_email = await userModel_1.userModel.findOne({ email });
+                if (check_email)
+                    return res.status(400).json({ error: "Email already exists for another user" });
+                data_to_update = Object.assign(Object.assign({}, data_to_update), { email });
+            }
+            ;
+            const fieldsToUpdate = { username, group, name };
+            for (const [key, value] of Object.entries(fieldsToUpdate)) {
+                if (value !== undefined && value !== null && value !== '') {
+                    data_to_update = Object.assign(Object.assign({}, data_to_update), { [key]: value });
+                }
+            }
+            ;
+            const updatedUser = await userModel_1.userModel.updateOne({ _id: clientId }, { $set: data_to_update });
+            if (!updatedUser.acknowledged) {
+                return res.status(400).json({ message: "Unable to update profile" });
+            }
+            ;
+            return res.status(200).json({
+                success: true,
+                message: "Profile updated successfully"
+            });
+        }
+        catch (e) {
+            console.error("Error editing profile: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async upload_svg(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const file = req.file;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            if (!file)
+                return res.status(400).json({ error: "No file uploaded" });
+            const uploadImageHandler = () => {
+                return new Promise((resolve, reject) => {
+                    const svgImageResult = upload_1.cloudinary.v2.uploader.upload_stream({
+                        resource_type: "raw",
+                        folder: `Profile_Pictures`,
+                    }, (error, data) => {
+                        if (error) {
+                            reject(error);
+                        }
+                        else {
+                            resolve(data);
+                            return data;
+                        }
+                    });
+                    streamifier_1.default.createReadStream(file.buffer).pipe(svgImageResult);
+                });
+            };
+            const svgResult = await uploadImageHandler();
+            const svgUrl = svgResult.secure_url;
+            const update = await userModel_1.userModel.updateOne({ _id: clientId }, {
+                svgUrl: svgUrl
+            });
+            if (!update.acknowledged)
+                return res.status(400).json({ message: "Unable to upload SVG" });
+            return res.status(200).json({
+                success: true,
+                message: "SVG uploaded successfully",
+                svgUrl
+            });
+        }
+        catch (e) {
+            console.error("Error uploading SVG: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async add_notes(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.AddNoteSchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const fetch_client = await userModel_1.userModel.findById(clientId);
+            if (!fetch_client)
+                return res.status(400).json({ error: "Client not found" });
+            const agentId = fetch_client.agents[0].agentId;
+            const { callId, notes } = body;
+            const check_callId = await historyModel_1.default.findOne({ callId, agentId });
+            if (!check_callId)
+                return res.status(400).json({ error: "CallId does not exist or is not under agentId" });
+            const update_note = await historyModel_1.default.updateOne({ callId }, { notes });
+            if (!update_note.acknowledged)
+                return res.status(400).json({ error: "Unable to add notes" });
+            return res.status(200).json({
+                success: true,
+                message: "Notes added successfully",
+                update_note
+            });
+        }
+        catch (e) {
+            console.error("Error adding notes: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async voice_kpi(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.VoiceKPISchema.validate(body, {
+                abortEarly: false
+            });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const dateOption = req.body.dateOption;
+            const { agentIds, data } = body;
+            const page = parseInt(body.page) || 1;
+            const pageSize = 100;
+            const skip = (page - 1) * pageSize;
+            let query = {
+                agentId: { $in: agentIds }
+            };
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            if (!Object.values(types_1.DateOption).includes(dateOption)) {
+                return res.status(400).json({ error: "Invalid date option" });
+            }
+            ;
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = (0, date_fns_tz_1.toZonedTime)(now, timeZone);
+            switch (dateOption) {
+                case types_1.DateOption.ThisWeek:
+                    const weekdays = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = (0, date_fns_1.subDays)(zonedNow, i);
+                        const dayOfWeek = day.getDay();
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                            const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                            weekdays.push(valid_day);
+                        }
+                        ;
+                    }
+                    ;
+                    query.date = { $in: weekdays };
+                    break;
+                case types_1.DateOption.ThisMonth:
+                    const monthDates = [];
+                    for (let i = 0; i < now.getDate(); i++) {
+                        const day = (0, date_fns_1.subDays)(now, i);
+                        const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                        monthDates.unshift(valid_day);
+                    }
+                    ;
+                    query.date = { $in: monthDates };
+                    break;
+                case types_1.DateOption.PastMonth:
+                    const pastDates = [];
+                    for (let i = 0; i < 30; i++) {
+                        const day = (0, date_fns_1.subDays)(now, i);
+                        const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                        pastDates.unshift(valid_day);
+                    }
+                    ;
+                    query.date = { $in: pastDates };
+                    break;
+                case types_1.DateOption.Total:
+                    // query.date = {};
+                    console.log("total");
+                    break;
+                case types_1.DateOption.LAST_SCHEDULE:
+                    const recent_job = await contact_model_1.jobModel
+                        .findOne({ agentId: { $in: agentIds } })
+                        .sort({ createdAt: -1 })
+                        .lean();
+                    console.log("recent job: ", recent_job);
+                    if (!recent_job) {
+                        query.date = {};
+                    }
+                    else {
+                        const dateToCheck = recent_job.scheduledTime.split("T")[0];
+                        query.date = dateToCheck;
+                    }
+                    ;
+                    break;
+            }
+            ;
+            switch (data) {
+                case "outbound":
+                    query.direction = "outbound";
+                    break;
+                case "liveAnswers":
+                    query.call_outcome = "successful";
+                    break;
+                case "automatedAnswers":
+                    query.disconnectionReason = { $in: ["voicemail_reached", "machine_detected"] };
+                    break;
+                case "transfers":
+                    query.disconnectionReason = "call_transfer";
+                    break;
+                case "appointments":
+                    query.userSentiment = "scheduled";
+                    break;
+            }
+            ;
+            console.log("queryyyyyyy: ", query);
+            const callHistory = await historyModel_1.default
+                .find(query)
+                .sort({ startTimestamp: -1 })
+                .skip(skip)
+                .limit(pageSize)
+                .lean();
+            const callHistories = await Promise.all(callHistory.map(async (history) => {
+                const lead = await contact_model_1.contactModel.findOne({ callId: history.callId }).lean();
+                const calledTimes = (lead === null || lead === void 0 ? void 0 : lead.calledTimes) || 0;
+                const lastCalled = (lead === null || lead === void 0 ? void 0 : lead.datesCalled[0]) || "";
+                const timestamp = history.startTimestamp || 0;
+                const time = luxon_1.DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
+                const formattedDuration = history.durationMs ? (() => {
+                    const durationParts = typeof (history === null || history === void 0 ? void 0 : history.durationMs) === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
+                    return `${durationParts[1]}:${durationParts[2]}`;
+                })() : "00:00";
+                return {
+                    callId: history.callId || "",
+                    firstName: history.userFirstname || "",
+                    lastName: history.userLastname || "",
+                    email: history.userEmail || "",
+                    phone: history.toNumber || "",
+                    agentId: history.agentId || "",
+                    duration: formattedDuration || "",
+                    status: history.callStatus || "",
+                    dial_status: history.dial_status || "",
+                    transcript: history.transcript || "",
+                    sentiment: history.userSentiment || "",
+                    timestamp: history.endTimestamp || "",
+                    summary: history.callSummary || "",
+                    recording: history.recordingUrl || "",
+                    address: history.address || "",
+                    callAttempts: calledTimes || 0,
+                    lastCalled,
+                    time,
+                    callType: history.callType || "",
+                    disconnectionReason: history.disconnectionReason || "",
+                    direction: history.direction || "",
+                    callOutcome: history.call_outcome || "",
+                    notes: history.notes || ""
+                };
+            }));
+            const totalRecords = await historyModel_1.default.countDocuments(query);
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            return res.status(200).json({
+                callHistories,
+                totalRecords,
+                totalPages,
+                page
+            });
+        }
+        catch (e) {
+            console.error("Error fetching voice kpi: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async export_kpi(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const { error } = client_1.ExportKPISchema.validate(body, { abortEarly: false });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { agents } = check_user;
+            const agentId = agents[0].agentId;
+            const dateOption = req.body.dateOption;
+            const { data } = req.body;
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = (0, date_fns_tz_1.toZonedTime)(now, timeZone);
+            let query = {
+                agentId
+            };
+            console.log("dateOption: ", dateOption);
+            switch (dateOption) {
+                case types_1.DateOption.ThisWeek:
+                    const weekdays = [];
+                    for (let i = 0; i < 7; i++) {
+                        const day = (0, date_fns_1.subDays)(zonedNow, i);
+                        const dayOfWeek = day.getDay();
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                            const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                            weekdays.push(valid_day);
+                        }
+                        ;
+                    }
+                    ;
+                    query.date = {
+                        $gte: `${weekdays[weekdays.length - 1]}T00:00:00+00:00`,
+                        $lte: `${weekdays[0]}T23:59:59+00:00`
+                    };
+                    break;
+                case types_1.DateOption.ThisMonth:
+                    const monthDates = [];
+                    for (let i = 0; i < now.getDate(); i++) {
+                        const day = (0, date_fns_1.subDays)(now, i);
+                        const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                        monthDates.unshift(valid_day);
+                    }
+                    ;
+                    query.date = {
+                        $gte: `${monthDates[0]}T00:00:00+00:00`,
+                        $lte: `${monthDates[monthDates.length - 1]}T23:59:59+00:00`
+                    };
+                    break;
+                case types_1.DateOption.PastMonth:
+                    const pastDates = [];
+                    for (let i = 0; i < 30; i++) {
+                        const day = (0, date_fns_1.subDays)(now, i);
+                        const valid_day = (0, date_fns_tz_1.format)(day, "yyyy-MM-dd", { timeZone });
+                        pastDates.unshift(valid_day);
+                    }
+                    ;
+                    query.date = {
+                        $gte: `${pastDates[0]}T00:00:00+00:00`,
+                        $lte: `${pastDates[pastDates.length - 1]}T23:59:59+00:00`
+                    };
+                    break;
+                case types_1.DateOption.Total:
+                    console.log("total");
+                    break;
+                case types_1.DateOption.LAST_SCHEDULE:
+                    const recent_job = await contact_model_1.jobModel
+                        .findOne({ agentId })
+                        .sort({ createdAt: -1 })
+                        .lean();
+                    console.log("recent job: ", recent_job);
+                    if (!recent_job) {
+                        query.date = {};
+                    }
+                    else {
+                        const dateToCheck = recent_job.scheduledTime.split("T")[0];
+                        query.date = dateToCheck;
+                    }
+                    ;
+                    break;
+            }
+            ;
+            switch (data) {
+                case "liveAnswers":
+                    query.disconnectionReason = {
+                        $in: ["user_hangup", "agent_hangup"]
+                    };
+                    query.userSentiment = { $ne: "dnc" };
+                    break;
+                case "outbound":
+                    query.direction = "outbound";
+                    break;
+                case "transfers":
+                    query.disconnectionReason = "call_transfer";
+                    break;
+                case "appointments":
+                    query.userSentiment = "scheduled";
+                    break;
+                case "automatedAnswers":
+                    query.disconnectionReason = {
+                        $in: ["voicemail_reached", "machine_detected"]
+                    };
+                    break;
+            }
+            ;
+            console.log("query: ", query);
+            const result = await historyModel_1.default.aggregate([
+                {
+                    $match: query
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        firstName: "$userFirstname",
+                        lastName: "$userLastname",
+                        email: "$userEmail",
+                        dateCalled: "$date",
+                        transcript: "$transcript"
+                    }
+                }
+            ]);
+            const filePath = path_1.default.join(__dirname, "..", "..", "public", "answers.csv");
+            const csvWriter = (0, csv_writer_1.createObjectCsvWriter)({
+                path: filePath,
+                header: [
+                    { id: "firstName", title: "firstName" },
+                    { id: "lastName", title: "lastName" },
+                    { id: "email", title: "email" },
+                    { id: "dateCalled", title: "dateCalled" },
+                    { id: "transcript", title: "transcript" }
+                ]
+            });
+            await csvWriter.writeRecords(result);
+            console.log("csv file written successfully");
+            if (fs_1.default.existsSync(filePath)) {
+                res.setHeader("Content-Disposition", "attachment; filename=answers.csv");
+                res.setHeader("Content-Type", "text/csv");
+                const fileStream = fs_1.default.createReadStream(filePath);
+                fileStream.pipe(res);
+            }
+            else {
+                console.log("CSV FILE not found: ", filePath);
+                return res.status(404).send("CSV FILE not found");
+            }
+            ;
+            console.log("the end");
+        }
+        catch (e) {
+            console.error("Error exporting data: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async email_kpi(req, res, next) {
+        try {
+            const body = req.body;
+            const { agentId, stamp, page } = body;
+            console.log("stamp: ", stamp);
+            const RETELL_KEY = process.env.RETELL_API_KEY;
+            const data = Object.assign({ sort_order: "ascending", limit: 1000, filter_criteria: {
+                    agent_id: [agentId],
+                    disconnection_reason: ["voicemail_reached", "machine_detected"],
+                    start_timestamp: {
+                        lower_threshold: stamp
+                    }
+                } }, (page && { pagination_key: page }));
+            console.log("data: ", data);
+            const options = {
+                method: "post",
+                url: `https://api.retellai.com/v2/list-calls`,
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${RETELL_KEY}`
+                },
+                data
+            };
+            // 1746086420000
+            const response = await (0, axios_1.default)(options);
+            const response_data = response.data;
+            console.log("resp: ", response_data);
+            console.log("length: ", response_data.length);
+            const calls = response_data.map((call) => ({
+                updateOne: {
+                    filter: { callId: call.call_id },
+                    update: {
+                        $set: { disconnectionReason: call.disconnection_reason }
+                    }
+                }
+            }));
+            console.log(JSON.stringify(calls, null, 2));
+            const result = await historyModel_1.default.bulkWrite(calls);
+            console.log("res: ", result);
+            console.log("data: ", data);
+            return res.status(200).json({
+                success: true,
+                result
+            });
+            // console.log("length: ", response_data.length);
+            // console.log("calls: ", calls);
+        }
+        catch (e) {
+            console.error("Error fetching email kpi: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async client_details(req, res, next) {
+        var _a;
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel_1.userModel.findById(clientId).select("email username group name agents autoEmail svgUrl").lean();
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const result = {
+                name: check_user.name,
+                email: check_user.email,
+                username: check_user.username,
+                group: check_user.group,
+                agentId: ((_a = check_user === null || check_user === void 0 ? void 0 : check_user.agents[0]) === null || _a === void 0 ? void 0 : _a.agentId) || "",
+                autoEmail: check_user.autoEmail || check_user.email,
+                logo: check_user.svgUrl || ""
+            };
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching client details: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+}
+;
+exports.client_service = new ClientService();
