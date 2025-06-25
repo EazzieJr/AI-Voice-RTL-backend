@@ -77,4 +77,6 @@ router
 
     .post("/export-kpi", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.export_kpi(req, res, next))
 
+    .get("/details", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.client_details(req, res, next))
+
 export default router; 
