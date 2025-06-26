@@ -1067,8 +1067,8 @@ class ClientService extends _root_1.default {
                 end = endDate;
             }
             ;
-            // console.log("start: ", start);
-            // console.log("end: ", end);
+            console.log("start: ", start);
+            console.log("end: ", end);
             const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
             const clients = await axios_1.default.get(clients_url);
             const clients_data = clients.data;
@@ -1099,62 +1099,24 @@ class ClientService extends _root_1.default {
             let result = [];
             for (const campaign of client_campaigns) {
                 const { id } = campaign;
-                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
-                const analytics = await axios_1.default.get(analyticsUrl);
-                const campaign_analytics = analytics.data;
-                // console.log("campaign_analytics: ", campaign_analytics);
-                const campaign_details = campaign_analytics.data[0];
-                if (campaign_details) {
-                    result.push(campaign_details);
-                }
-                ;
-            }
-            ;
-            for (const campaign of client_campaigns) {
-                const { id } = campaign;
-                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
+                const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
                 const analytics = await axios_1.default.get(analyticsUrl);
                 const campaign_analytics = analytics.data;
                 if (campaign_analytics) {
                     result.push(campaign_analytics);
                 }
                 ;
-                // console.log("campaign_analytics: ", campaign_analytics);
             }
             ;
             ;
-            // interface CampaignObject {
-            //     email_campaign_seq_id: number,
-            //     sent_count: string,
-            //     skipped_count: string,
-            //     open_count: string,
-            //     click_count: string,
-            //     reply_count: string,
-            //     bounce_count: string,
-            //     unsubscribed_count: string,
-            //     failed_count: string,
-            //     stopped_count: string,
-            //     ln_connection_req_pending_count: string,
-            //     ln_connection_req_accepted_count: string,
-            //     ln_connection_req_skipped_sent_msg_count: string,
-            //     positive_reply_count: string
-            // };
             const summedValues = {};
-            const parent_keys = ["sent_count", "open_count", "click_count", "reply_count", "bounce_count"];
-            const stat_keys = ["interested", "total"];
+            const parent_keys = ["sent_count", "open_count", "click_count", "reply_count", "bounce_count", "positive_reply_count", "total_count"];
             parent_keys.forEach((key) => {
-                summedValues[key] = 0;
-            });
-            stat_keys.forEach((key) => {
                 summedValues[key] = 0;
             });
             result.forEach((campaign) => {
                 parent_keys.forEach((key) => {
                     summedValues[key] += parseInt(campaign[key]) || 0;
-                });
-                stat_keys.forEach((key) => {
-                    var _a;
-                    summedValues[key] += ((_a = campaign.campaign_lead_stats) === null || _a === void 0 ? void 0 : _a[key]) || 0;
                 });
             });
             const dashboard = {
@@ -1162,9 +1124,9 @@ class ClientService extends _root_1.default {
                 replied: summedValues.reply_count,
                 opened: summedValues.open_count,
                 clicked: summedValues.click_count,
-                positive_reply: summedValues.interested,
+                positive_reply: summedValues.positive_reply_count,
                 bounced: summedValues.bounce_count,
-                contacts: summedValues.total
+                contacts: summedValues.total_count,
             };
             return res.status(200).json({
                 success: true,
