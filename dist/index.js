@@ -7,5 +7,6 @@ const dotenv_1 = __importDefault(require("dotenv"));
 // Load up env file which contains credentials
 dotenv_1.default.config({ path: `.env.${process.env.NODE_ENV}` });
 const server_1 = require("./server");
+const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 const server = new server_1.Server();
-server.listen(8080);
+server.listen(PORT);
