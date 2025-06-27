@@ -2377,6 +2377,7 @@ class ClientService extends RootService {
         try {
             const clientId = req.user._id;
             const body = req.body;
+            const svgFile = req.file as Express.Multer.File;
 
             const { error } = EditProfileSchema.validate(body, { abortEarly: false } );
             if (error) return this.handle_validation_errors(error, res, next);
@@ -2419,6 +2420,37 @@ class ClientService extends RootService {
                     ...data_to_update,
                     email
                 };
+            };
+
+            if (svgFile) {
+                const uploadFileHandler = () => {
+                    return new Promise((resolve, reject) => {
+                        const svgImageResult = cloudinary.v2.uploader.upload_stream(
+                            { 
+                                resource_type: "raw", 
+                                folder: `Client_Logos`,     
+                            }, 
+                            (error, data) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    resolve(data);
+                                    return data; 
+                                }
+                            });
+
+                        streamifier.createReadStream(svgFile.buffer).pipe(svgImageResult);
+                    });
+                };
+
+                const svgResult = await uploadFileHandler() as any;
+                const svgUrl = svgResult.secure_url;
+
+                data_to_update = {
+                    ...data_to_update,
+                    svgUrl
+                };
+
             };
 
             const fieldsToUpdate = { username, group, name };

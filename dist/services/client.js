@@ -1899,6 +1899,7 @@ class ClientService extends _root_1.default {
         try {
             const clientId = req.user._id;
             const body = req.body;
+            const svgFile = req.file;
             const { error } = client_1.EditProfileSchema.validate(body, { abortEarly: false });
             if (error)
                 return this.handle_validation_errors(error, res, next);
@@ -1930,6 +1931,29 @@ class ClientService extends _root_1.default {
                 if (check_email)
                     return res.status(400).json({ error: "Email already exists for another user" });
                 data_to_update = Object.assign(Object.assign({}, data_to_update), { email });
+            }
+            ;
+            if (svgFile) {
+                const uploadFileHandler = () => {
+                    return new Promise((resolve, reject) => {
+                        const svgImageResult = upload_1.cloudinary.v2.uploader.upload_stream({
+                            resource_type: "raw",
+                            folder: `Client_Logos`,
+                        }, (error, data) => {
+                            if (error) {
+                                reject(error);
+                            }
+                            else {
+                                resolve(data);
+                                return data;
+                            }
+                        });
+                        streamifier_1.default.createReadStream(svgFile.buffer).pipe(svgImageResult);
+                    });
+                };
+                const svgResult = await uploadFileHandler();
+                const svgUrl = svgResult.secure_url;
+                data_to_update = Object.assign(Object.assign({}, data_to_update), { svgUrl });
             }
             ;
             const fieldsToUpdate = { username, group, name };
