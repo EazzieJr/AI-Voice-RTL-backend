@@ -1022,6 +1022,7 @@ class ClientService extends _root_1.default {
     }
     ;
     async campaign_dashboard(req, res, next) {
+        var _a, _b, _c, _d, _e;
         try {
             const clientId = req.user._id;
             const check_user = await userModel_1.userModel.findById(clientId);
@@ -1097,13 +1098,23 @@ class ClientService extends _root_1.default {
                 return res.status(400).json({ message: "No Analytics not found" });
             const client_campaigns = all_campaigns.filter((campaign) => campaign.client_id === id);
             let result = [];
+            let failedCampaigns = [];
             for (const campaign of client_campaigns) {
                 const { id } = campaign;
                 const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
-                const analytics = await axios_1.default.get(analyticsUrl);
-                const campaign_analytics = analytics.data;
-                if (campaign_analytics) {
-                    result.push(campaign_analytics);
+                try {
+                    const analytics = await axios_1.default.get(analyticsUrl);
+                    const campaign_analytics = analytics.data;
+                    if (campaign_analytics) {
+                        result.push(campaign_analytics);
+                    }
+                    ;
+                }
+                catch (err) {
+                    console.error("Error: ", ((_b = (_a = err === null || err === void 0 ? void 0 : err.response) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.error) || err);
+                    console.error(`Failed to fetch analytic for campaign id: ${id}. Error: ${err}`);
+                    failedCampaigns.push({ campaignId: id, error: ((_d = (_c = err === null || err === void 0 ? void 0 : err.response) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.error) || "Unknown error" });
+                    continue;
                 }
                 ;
             }
@@ -1128,13 +1139,17 @@ class ClientService extends _root_1.default {
                 bounced: summedValues.bounce_count,
                 contacts: summedValues.total_count,
             };
+            console.log("failedCampaigns: ", failedCampaigns);
             return res.status(200).json({
                 success: true,
-                result: Object.assign({}, dashboard)
+                result: Object.assign({}, dashboard),
+                failedCampaigns
             });
         }
         catch (e) {
             console.error("Error fetching campaign dashboard: " + e);
+            console.error("Error response: ", e === null || e === void 0 ? void 0 : e.response);
+            console.error("Error response data: ", (_e = e.response) === null || _e === void 0 ? void 0 : _e.data);
             next(e);
         }
         ;

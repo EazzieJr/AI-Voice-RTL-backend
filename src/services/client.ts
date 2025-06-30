@@ -1269,75 +1269,29 @@ class ClientService extends RootService {
             const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id);
 
             let result: Object[] = [];
+            let failedCampaigns: Object[] = [];
 
             for (const campaign of client_campaigns) {
                 const { id } = campaign;
 
                 const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
 
-                const analytics = await axios.get(analyticsUrl);
-                const campaign_analytics = analytics.data;
+                try {
+                    const analytics = await axios.get(analyticsUrl);
+                    const campaign_analytics = analytics.data;
 
-                if (campaign_analytics) {
-                    result.push(campaign_analytics);
+                    if (campaign_analytics) {
+                        result.push(campaign_analytics);
+                    };
+                } catch (err: any) {
+                    console.error("Error: ", err?.response?.data?.error || err);
+                    console.error(`Failed to fetch analytic for campaign id: ${id}. Error: ${err}`);
+                    failedCampaigns.push({ campaignId: id, error: err?.response?.data?.error || "Unknown error" });
+                    continue;
                 };
                 
             };
 
-            // for (const campaign of client_campaigns) {
-            //     const { id } = campaign;
-
-            //     const analyticsUrl = `${process.env.SMART_LEAD_URL}/campaigns/${id}/analytics?api_key=${process.env.SMART_LEAD_API_KEY}`;
-
-            //     const analytics = await axios.get(analyticsUrl);
-            //     const campaign_analytics = analytics.data;
-
-            //     if (campaign_analytics) {
-            //         result.push(campaign_analytics);
-            //     };
-            //     // console.log("campaign_analytics: ", campaign_analytics);
-            // };
-
-            // interface CampaignObject {
-            //     id: number,
-            //     user_id: number,
-            //     created_at: string,
-            //     status: string,
-            //     name: string,
-            //     sent_count: string,
-            //     open_count: string,
-            //     click_count: string,
-            //     reply_count: string,
-            //     block_count: string,
-            //     total_count: string,
-            //     sequence_count: string,
-            //     drafted_count: string,
-            //     tags: any,
-            //     unique_sent_count: string,
-            //     unique_open_count: string,
-            //     unique_click_count: string,
-            //     client_id: number,
-            //     bounce_count: string,
-            //     parent_campaign_id: any,
-            //     unsubscribed_count: string,
-            //     campaign_lead_stats: {
-            //         total: number,
-            //         paused: number,
-            //         blocked: number,
-            //         revenue: number,
-            //         stopped: number,
-            //         completed: number,
-            //         inprogress: number,
-            //         interested: number,
-            //         notStarted: number
-            //     },
-            //     team_member_id?: any,
-            //     send_as_plain_text?: boolean,
-            //     client_name?: string,
-            //     client_email?: string,
-            //     client_company_name?: string
-            // };
-            
             interface CampaignObject {
                 id: number,
                 user_id: number,
@@ -1386,15 +1340,20 @@ class ClientService extends RootService {
                 contacts: summedValues.total_count,
             };
 
+            console.log("failedCampaigns: ", failedCampaigns);
+
             return res.status(200).json({
                 success: true,
                 result: {
                     ...dashboard
-                }
+                },
+                failedCampaigns
             });
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Error fetching campaign dashboard: " + e);
+            console.error("Error response: ", e?.response);
+            console.error("Error response data: ", e.response?.data);
             next(e);
         };
     };
