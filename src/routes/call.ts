@@ -29,4 +29,8 @@ router
         call_service.call_outcome_script(req, res, next);
     })
 
+    .put("/update-status", (req: Request, res: Response, next: NextFunction) => {
+        call_service.update_history(req, res, next);
+    })
+
 export default router;

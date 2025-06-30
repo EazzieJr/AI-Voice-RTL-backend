@@ -2427,8 +2427,9 @@ class ClientService extends RootService {
                     return new Promise((resolve, reject) => {
                         const svgImageResult = cloudinary.v2.uploader.upload_stream(
                             { 
-                                resource_type: "raw", 
-                                folder: `Client_Logos`,     
+                                resource_type: "image", 
+                                folder: `Client_Logos`,
+                                public_id: `${Date.now()}_cover_${svgFile.originalname.replace(/\s/g, "_")}`   
                             }, 
                             (error, data) => {
                                 if (error) {

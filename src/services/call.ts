@@ -18,6 +18,9 @@ import { userModel, IUser } from "../models/userModel";
 import { limits } from "argon2";
 import { url } from "inspector";
 import { TimeSeriesReducers } from "redis";
+import { add } from "date-fns";
+import { date } from "joi";
+import { stat } from "fs";
 
 class CallService extends RootService {
 
@@ -1103,6 +1106,224 @@ class CallService extends RootService {
         };
     };
     
+    async update_history(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const { jobId, todayString, time } = req.body;
+
+            // const retellClient = new Retell({
+            //     apiKey: process.env.RETELL_API_KEY
+            // });
+
+            const contacts = await contactModel.find({
+                jobProcessedWithId: jobId
+            }).limit(1000);
+
+            function convertMsToHourMinSec(ms: number): string {
+                const totalSeconds = Math.floor(ms / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+
+                return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+            };
+
+            for (const contact of contacts) {
+                const RETELL_KEY = process.env.RETELL_API_KEY;
+
+                const options = {
+                    method: "GET",
+                    url: `https://api.retellai.com/v2/get-call/${contact.callId}`,
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${RETELL_KEY}`
+                    }
+                };
+
+                const call_response = await axios(options);
+                const result = call_response.data;
+
+                // const result = await retellClient.call.retrieve(contact.callId as string);
+
+                const call_failed = result.disconnection_reason === "dial_failed";
+                const call_transferred = result.disconnection_reason === "call_transfer";
+                const dial_no_answer = result.disconnection_reason === "dial_no_answer";
+                const call_inactivity = result.disconnection_reason === 'inactivity';
+                const call_hangedup = result.disconnection_reason === "user_hangup" || result.disconnection_reason === "agent_hangup";
+                const call_error = result.disconnection_reason === "error_inbound_webhook" || "error_llm_websocket_open" || "error_llm_websocket_lost_connection" || "error_llm_websocket_runtime" || "error_llm_websocket_corrupt_payload" || "error_frontend_corrupted_payload" || "error_twilio" || "error_no_audio_received" || "error_asr" || "error_retell" || "error_unknown" || "error_user_not_joined";
+
+                const analyzedTranscriptForStatus = await reviewTranscript(result.transcript);
+
+                const is_call_scheduled = analyzedTranscriptForStatus.message.content === "scheduled";
+                const is_machine = analyzedTranscriptForStatus.message.content === "voicemail";
+                const is_ivr = analyzedTranscriptForStatus.message.content === "ivr";
+                const is_dnc = analyzedTranscriptForStatus.message.content === "dnc";
+                const is_callback = analyzedTranscriptForStatus.message.content === "call-back";
+
+                const is_neutral = result.call_analysis.user_sentiment === "Neutral";
+                const is_unknown = result.call_analysis.user_sentiment === "Unknown";
+                const is_positive = result.call_analysis.user_sentiment === "Positive";
+                const is_negative = result.call_analysis.user_sentiment === "Negative";
+
+                const call_back_date = await reviewCallback(result.transcript);
+
+                const duration_in_HMS = convertMsToHourMinSec(result.duration_ms);
+                const total_duration = convertMsToHourMinSec(result.end_timestamp - result.start_timestamp) || 0;
+
+                let callStatus;
+                let callOutcome;
+                let sentimentStatus;
+                let statsUpdate: any = { $inc: {} };
+
+                statsUpdate.$inc.totalCalls = 1;
+                statsUpdate.$inc.totalCallDuration = result.duration_ms;
+                let callError;
+
+                if (is_machine) {
+                    callStatus = callstatusenum.VOICEMAIL;
+                    statsUpdate.$inc.totalAnsweredByVm = 1;
+                } else if (is_ivr) {
+                    callStatus = callstatusenum.IVR;
+                    statsUpdate.$inc.totalAnsweredByIVR = 1;
+                } else if (is_call_scheduled) {
+                    callStatus = callstatusenum.SCHEDULED;
+                    statsUpdate.$inc.totalAppointment = 1;
+                } else if (call_failed) {
+                    callStatus = callstatusenum.FAILED;
+                    callOutcome = calloutcome.FAILED;
+                    statsUpdate.$inc.totalFailed = 1;
+                } else if (call_transferred) {
+                    callStatus = callstatusenum.TRANSFERRED;
+                    callOutcome = calloutcome.TRANSFERRED;
+                    statsUpdate.$inc.totalTransffered = 1;
+                } else if (dial_no_answer) {
+                    callStatus = callstatusenum.NO_ANSWER;
+                    statsUpdate.$inc.totalDialNoAnswer = 1;
+                } else if (call_inactivity) {
+                    callStatus = callstatusenum.INACTIVITY;
+                    statsUpdate.$inc.totalCallInactivity = 1;
+                } else if (call_hangedup) {
+                    callStatus = callstatusenum.CALLED;
+                    callOutcome = calloutcome.SUCCESS;
+                    statsUpdate.$inc.totalCallAnswered = 1;
+                } else if (call_error) {
+                    callError = callstatusenum.ERROR;
+                };
+
+                if (is_call_scheduled) {
+                    sentimentStatus = callSentimentenum.SCHEDULED;
+                    callOutcome = calloutcome.SCHEDULED;
+                } else if (is_callback) {
+                    sentimentStatus = callSentimentenum.CALLBACK;
+                } else if (is_dnc) {
+                    sentimentStatus = callSentimentenum.DNC;
+                    callOutcome = calloutcome.DNC;
+                } else if (is_neutral) {
+                    sentimentStatus = callSentimentenum.NEUTRAL;
+                } else if (is_positive) {
+                    sentimentStatus = callSentimentenum.POSITIVE;
+                } else if (is_negative) {
+                    sentimentStatus = callSentimentenum.NEGATIVE;
+                } else if (is_unknown) {
+                    sentimentStatus = callSentimentenum.UNKNOWN;
+                };
+
+                const new_transcript = await EventModel.create({
+                    callId: result.call_id,
+                    agentId: result.agent_id,
+                    recordingUrl: result.recording_url,
+                    callDuration: duration_in_HMS,
+                    disconnectionReason: result.disconnection_reason,
+                    callBackDate: call_back_date,
+                    retellCallStatus: result.call_status,
+                    duration: total_duration,
+                    timestamp: result.end_timestamp,
+                    ...(result.transcript && { transcript: result.transcript }),
+                    retellCallSummary: result.call_analysis.call_summary,
+                    analyzedTranscript: sentimentStatus,
+                    userSentiment: sentimentStatus
+                });
+
+                const callData = {
+                    callId: result.call_id,
+                    agentId: result.agent_id,
+                    userFirstname: result.retell_llm_dynamic_variables?.user_firstname || null,
+                    userLastname: result.retell_llm_dynamic_variables?.user_lastname || null,
+                    userEmail: result.retell_llm_dynamic_variables?.user_email || null,
+                    recordingUrl: result.recording_url || null,
+                    disconnectionReason: result.disconnection_reason || call_error || null,
+                    callStatus: result.call_status,
+                    startTimestamp: result.start_timestamp || null,
+                    endTimestamp: result.end_timestamp || null,
+                    durationMs: total_duration,
+                    transcript: result.transcript || null,
+                    transcriptObject: result.transcript_object || [],
+                    transcriptWithToolCalls: result.transcript_with_tool_calls || [],
+                    publicLogUrl: result.public_log_url || null,
+                    callType: result.call_type || null,
+                    fromNumber: result.from_number || null,
+                    toNumber: result.to_number || null,
+                    direction: result.direction || null,
+                    date: todayString,
+                    address: result.retell_llm_dynamic_variables?.user_address || null,
+                    dial_status: callStatus,
+                    callSummary: result.call_analysis.call_summary || null,
+                    userSentiment: sentimentStatus,
+                    call_outcome: callOutcome || null
+                };
+
+                await callHistoryModel.create(callData);
+
+                const statResults = await DailyStatsModel.findOneAndUpdate(
+                    { day: todayString, agentId: result.agent_id, jobProcessedBy: jobId },
+                    statsUpdate,
+                    { returnOriginal: false }
+                );
+
+                const timestamp = new Date();
+                await updateStatsByHour(result.agent_id, todayString, timestamp);
+
+                await contactModel.findOneAndUpdate(
+                    { callId: result.call_id, agentId: result.agent_id },
+                    {
+                        dial_status: callStatus,
+                        $push: {
+                            datesCalled: todayString
+                        },
+                        referenceToCallId: new_transcript._id,
+                        timesCalled: time,
+                        $inc: {
+                            calledTimes: 1
+                        },
+                        linktocallLogModel: statResults?._id || null
+                    }
+                );
+
+                if (result.call_analysis.call_successful === false && analyzedTranscriptForStatus.message.content === "interested") {
+                    await axios.post(process.env.MAKE_URL, {
+                        firstname: result.retell_llm_dynamic_variables.user_firstname,
+                        lastname: result.retell_llm_dynamic_variables.user_lastname,
+                        email: result.retell_llm_dynamic_variables.user_email,
+                        phone: result.to_number,
+                        summary: result.call_analysis.call_summary,
+                        url: result.recording_url || null,
+                        transcript: result.transcript,
+                    });
+                };
+
+                console.log("call updated for callId: ", result.call_id);
+            };
+
+            res.status(200).json({
+                success: true,
+                message: "Call history updated successfully",
+                updatedCount: contacts.length
+            });
+
+        } catch (e) {
+            console.error("Error updating call history: " + e);
+            next(e);
+        };
+    }
 };
 
 export const call_service = new CallService();

@@ -24,5 +24,8 @@ router
 })
     .put("/update-outcome", (req, res, next) => {
     call_1.call_service.call_outcome_script(req, res, next);
+})
+    .put("/update-status", (req, res, next) => {
+    call_1.call_service.update_history(req, res, next);
 });
 exports.default = router;

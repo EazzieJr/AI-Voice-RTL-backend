@@ -1937,8 +1937,9 @@ class ClientService extends _root_1.default {
                 const uploadFileHandler = () => {
                     return new Promise((resolve, reject) => {
                         const svgImageResult = upload_1.cloudinary.v2.uploader.upload_stream({
-                            resource_type: "raw",
+                            resource_type: "image",
                             folder: `Client_Logos`,
+                            public_id: `${Date.now()}_cover_${svgFile.originalname.replace(/\s/g, "_")}`
                         }, (error, data) => {
                             if (error) {
                                 reject(error);
