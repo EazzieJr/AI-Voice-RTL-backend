@@ -2458,7 +2458,7 @@ class ClientService extends _root_1.default {
         var _a;
         try {
             const clientId = req.user._id;
-            const check_user = await userModel_1.userModel.findById(clientId).select("email username group name agents autoEmail svgUrl").lean();
+            const check_user = await userModel_1.userModel.findById(clientId).select("email username group name agents autoEmail svgUrl clientType").lean();
             if (!check_user)
                 return res.status(400).json({ error: "User not found" });
             const result = {
@@ -2468,7 +2468,8 @@ class ClientService extends _root_1.default {
                 group: check_user.group,
                 agentId: ((_a = check_user === null || check_user === void 0 ? void 0 : check_user.agents[0]) === null || _a === void 0 ? void 0 : _a.agentId) || "",
                 autoEmail: check_user.autoEmail || check_user.email,
-                logo: check_user.svgUrl || ""
+                logo: check_user.svgUrl || "",
+                clientType: check_user.clientType
             };
             return res.status(200).json({
                 success: true,
