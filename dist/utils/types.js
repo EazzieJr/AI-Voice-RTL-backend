@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CampaignStatus = exports.calloutcome = exports.Category = exports.DateOption = exports.jobstatus = exports.callSentimentenum = exports.callstatusenum = exports.DaysToBeProcessedEnum = void 0;
+exports.ClientType = exports.CampaignStatus = exports.calloutcome = exports.Category = exports.DateOption = exports.jobstatus = exports.callSentimentenum = exports.callstatusenum = exports.DaysToBeProcessedEnum = void 0;
 var DaysToBeProcessedEnum;
 (function (DaysToBeProcessedEnum) {
     DaysToBeProcessedEnum["MONDAY"] = "monday";
@@ -101,4 +101,12 @@ var CampaignStatus;
     CampaignStatus["STOPPED"] = "STOPPED";
     CampaignStatus["ARCHIVED"] = "ARCHIVED";
 })(CampaignStatus || (exports.CampaignStatus = CampaignStatus = {}));
+;
+var ClientType;
+(function (ClientType) {
+    ClientType["MIXED"] = "mixed";
+    ClientType["VOICE"] = "voice";
+    ClientType["EMAIL"] = "email";
+    ClientType["INBOUND"] = "inbound";
+})(ClientType || (exports.ClientType = ClientType = {}));
 ;

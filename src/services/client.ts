@@ -10,7 +10,7 @@ import { userModel } from "../models/userModel";
 import { DailyStatsModel } from "../models/logModel";
 import callHistoryModel from "../models/historyModel";
 import fs, { stat } from "fs";
-import { IContact } from "../utils/types";
+import { IContact, ClientType } from "../utils/types";
 import csvParser from "csv-parser";
 import { formatPhoneNumber } from "../utils/formatter";
 import { DateTime } from "luxon";
@@ -2344,7 +2344,7 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { username, password, email, group, name, agent } = body;
+            const { username, password, email, group, name, agent, clientType } = body;
             let data_to_update = {};
 
             if (password) {
@@ -2378,6 +2378,17 @@ class ClientService extends RootService {
                 data_to_update = {
                     ...data_to_update,
                     email
+                };
+            };
+
+            if (clientType) {
+                if (!Object.values(ClientType).includes(clientType)) {
+                    return res.status(400).json({ error: "Invalid client type" });
+                };
+
+                data_to_update = {
+                    ...data_to_update,
+                    clientType
                 };
             };
 
@@ -2435,6 +2446,8 @@ class ClientService extends RootService {
             return res.status(200).json({
                 success: true,
                 message: "Profile updated successfully"
+                ,
+                updatedFields: data_to_update
             });
 
         } catch (e) {

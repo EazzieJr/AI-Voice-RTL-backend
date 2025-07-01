@@ -1,6 +1,7 @@
 import { model, Schema } from "mongoose";
 import argon2 from "argon2";
 import { Document } from "mongoose";
+import { ClientType } from "../utils/types";
 
 export interface IAgent {
   agentId?: string;
@@ -87,6 +88,11 @@ const userSchema = new Schema(
     autoEmail: {
       type: String,
       unique: true
+    },
+    clientType: {
+      type: String,
+      enum: Object.values(ClientType),
+      default: ClientType.MIXED,
     }
   },
   {

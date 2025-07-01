@@ -78,7 +78,8 @@ exports.EditProfileSchema = joi_1.default.object({
     email: joi_1.default.string(),
     group: joi_1.default.string(),
     name: joi_1.default.string(),
-    agent: joi_1.default.string()
+    agent: joi_1.default.string(),
+    clientType: joi_1.default.string(),
 });
 exports.AddNoteSchema = joi_1.default.object({
     callId: joi_1.default.string().required(),

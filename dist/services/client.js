@@ -14,6 +14,7 @@ const userModel_1 = require("../models/userModel");
 const logModel_1 = require("../models/logModel");
 const historyModel_1 = __importDefault(require("../models/historyModel"));
 const fs_1 = __importDefault(require("fs"));
+const types_2 = require("../utils/types");
 const csv_parser_1 = __importDefault(require("csv-parser"));
 const formatter_1 = require("../utils/formatter");
 const luxon_1 = require("luxon");
@@ -1921,7 +1922,7 @@ class ClientService extends _root_1.default {
             const check_user = await userModel_1.userModel.findById(clientId);
             if (!check_user)
                 return res.status(400).json({ error: "User not found" });
-            const { username, password, email, group, name, agent } = body;
+            const { username, password, email, group, name, agent, clientType } = body;
             let data_to_update = {};
             if (password) {
                 const new_hash = await argon2_1.default.hash(password);
@@ -1946,6 +1947,14 @@ class ClientService extends _root_1.default {
                 if (check_email)
                     return res.status(400).json({ error: "Email already exists for another user" });
                 data_to_update = Object.assign(Object.assign({}, data_to_update), { email });
+            }
+            ;
+            if (clientType) {
+                if (!Object.values(types_2.ClientType).includes(clientType)) {
+                    return res.status(400).json({ error: "Invalid client type" });
+                }
+                ;
+                data_to_update = Object.assign(Object.assign({}, data_to_update), { clientType });
             }
             ;
             if (svgFile) {
@@ -1986,7 +1995,8 @@ class ClientService extends _root_1.default {
             ;
             return res.status(200).json({
                 success: true,
-                message: "Profile updated successfully"
+                message: "Profile updated successfully",
+                updatedFields: data_to_update
             });
         }
         catch (e) {

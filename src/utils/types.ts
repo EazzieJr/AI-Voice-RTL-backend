@@ -278,3 +278,10 @@ export enum CampaignStatus {
   STOPPED = "STOPPED",
   ARCHIVED = "ARCHIVED"
 };
+
+export enum ClientType {
+  MIXED = "mixed",
+  VOICE = "voice",
+  EMAIL = "email",
+  INBOUND = "inbound",
+};

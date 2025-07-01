@@ -84,7 +84,8 @@ export const EditProfileSchema = Joi.object({
     email: Joi.string(),
     group: Joi.string(),
     name: Joi.string(),
-    agent: Joi.string()
+    agent: Joi.string(),
+    clientType: Joi.string(),
 });
 
 export const AddNoteSchema = Joi.object({

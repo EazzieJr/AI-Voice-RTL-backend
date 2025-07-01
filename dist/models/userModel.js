@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.userModel = void 0;
 const mongoose_1 = require("mongoose");
 const argon2_1 = __importDefault(require("argon2"));
+const types_1 = require("../utils/types");
 ;
 ;
 ;
@@ -62,6 +63,11 @@ const userSchema = new mongoose_1.Schema({
     autoEmail: {
         type: String,
         unique: true
+    },
+    clientType: {
+        type: String,
+        enum: Object.values(types_1.ClientType),
+        default: types_1.ClientType.MIXED, // Default to MIXED if not specified
     }
 }, {
     timestamps: true,
