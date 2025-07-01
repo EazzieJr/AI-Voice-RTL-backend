@@ -83,11 +83,10 @@ const handler_1 = __importDefault(require("./middleware/handler"));
 const routes_1 = __importDefault(require("./routes"));
 const recordModel_1 = require("./models/recordModel");
 const eodScheduler_1 = require("./utils/eodScheduler");
-const jobRecovery_1 = require("./utils/jobRecovery");
 (0, contact_model_1.connectDb)();
 (0, eodScheduler_1.DailyReport)();
 (0, eodScheduler_1.WeeklyReport)();
-(0, jobRecovery_1.restartScheduledJobs)();
+// restartScheduledJobs();
 // const smee = new SmeeClient({
 //   source: process.env.SMEE_URL,
 //   target: "https://api.intuitiveagents.ai/webhook",
@@ -164,7 +163,7 @@ class Server {
         this.batchDeleteUser();
         this.sendReportToClient();
         this.getNotCalledUsersAndDelete();
-        this.signUpUser();
+        // this.signUpUser();
         this.loginAdmin();
         this.loginUser();
         this.populateUserGet();
@@ -1738,33 +1737,36 @@ class Server {
             }
         });
     }
-    signUpUser() {
-        this.app.post("/user/signup", async (req, res) => {
-            try {
-                const { username, email, password, group, name } = req.body;
-                if (!username || !email || !password || !group) {
-                    return res
-                        .status(400)
-                        .json({ message: "Please provide all needed details" });
-                }
-                const savedUser = await userModel_1.userModel.create({
-                    username,
-                    email,
-                    password,
-                    group,
-                    name,
-                });
-                const token = jsonwebtoken_1.default.sign({ userId: savedUser._id, email: savedUser.email }, process.env.JWT_SECRET, { expiresIn: "6h" });
-                return res.json({
-                    payload: { message: "User created sucessfully", token },
-                });
-            }
-            catch (error) {
-                console.log(error);
-                return res.status(500).json({ message: "error while signing up" });
-            }
-        });
-    }
+    // signUpUser() {
+    //   this.app.post("/user/signup", async (req: Request, res: Response) => {
+    //     try {
+    //       const { username, email, password, group, name } = req.body;
+    //       if (!username || !email || !password || !group) {
+    //         return res
+    //           .status(400)
+    //           .json({ message: "Please provide all needed details" });
+    //       }
+    //       const savedUser = await userModel.create({
+    //         username,
+    //         email,
+    //         password,
+    //         group,
+    //         name,
+    //       });
+    //       const token = jwt.sign(
+    //         { userId: savedUser._id, email: savedUser.email },
+    //         process.env.JWT_SECRET,
+    //         { expiresIn: "6h" },
+    //       );
+    //       return res.json({
+    //         payload: { message: "User created sucessfully", token },
+    //       });
+    //     } catch (error) {
+    //       console.log(error);
+    //       return res.status(500).json({ message: "error while signing up" });
+    //     }
+    //   });
+    // }
     testingMake() {
         this.app.post("/make", async (req, res) => {
             try {

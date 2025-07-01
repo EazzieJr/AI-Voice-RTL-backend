@@ -91,7 +91,7 @@ import { restartScheduledJobs } from "./utils/jobRecovery";
 connectDb();
 DailyReport();
 WeeklyReport();
-restartScheduledJobs();
+// restartScheduledJobs();
 // const smee = new SmeeClient({
 //   source: process.env.SMEE_URL,
 //   target: "https://api.intuitiveagents.ai/webhook",
@@ -181,7 +181,7 @@ export class Server {
     this.batchDeleteUser();
     this.sendReportToClient();
     this.getNotCalledUsersAndDelete();
-    this.signUpUser();
+    // this.signUpUser();
     this.loginAdmin();
     this.loginUser();
     this.populateUserGet();
@@ -2134,36 +2134,36 @@ export class Server {
       }
     });
   }
-  signUpUser() {
-    this.app.post("/user/signup", async (req: Request, res: Response) => {
-      try {
-        const { username, email, password, group, name } = req.body;
-        if (!username || !email || !password || !group) {
-          return res
-            .status(400)
-            .json({ message: "Please provide all needed details" });
-        }
-        const savedUser = await userModel.create({
-          username,
-          email,
-          password,
-          group,
-          name,
-        });
-        const token = jwt.sign(
-          { userId: savedUser._id, email: savedUser.email },
-          process.env.JWT_SECRET,
-          { expiresIn: "6h" },
-        );
-        return res.json({
-          payload: { message: "User created sucessfully", token },
-        });
-      } catch (error) {
-        console.log(error);
-        return res.status(500).json({ message: "error while signing up" });
-      }
-    });
-  }
+  // signUpUser() {
+  //   this.app.post("/user/signup", async (req: Request, res: Response) => {
+  //     try {
+  //       const { username, email, password, group, name } = req.body;
+  //       if (!username || !email || !password || !group) {
+  //         return res
+  //           .status(400)
+  //           .json({ message: "Please provide all needed details" });
+  //       }
+  //       const savedUser = await userModel.create({
+  //         username,
+  //         email,
+  //         password,
+  //         group,
+  //         name,
+  //       });
+  //       const token = jwt.sign(
+  //         { userId: savedUser._id, email: savedUser.email },
+  //         process.env.JWT_SECRET,
+  //         { expiresIn: "6h" },
+  //       );
+  //       return res.json({
+  //         payload: { message: "User created sucessfully", token },
+  //       });
+  //     } catch (error) {
+  //       console.log(error);
+  //       return res.status(500).json({ message: "error while signing up" });
+  //     }
+  //   });
+  // }
   testingMake() {
     this.app.post("/make", async (req: Request, res: Response) => {
       try {

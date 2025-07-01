@@ -67,7 +67,7 @@ const userSchema = new mongoose_1.Schema({
     clientType: {
         type: String,
         enum: Object.values(types_1.ClientType),
-        default: types_1.ClientType.MIXED, // Default to MIXED if not specified
+        default: types_1.ClientType.MIXED,
     }
 }, {
     timestamps: true,
