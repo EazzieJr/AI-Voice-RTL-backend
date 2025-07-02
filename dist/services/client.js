@@ -830,7 +830,7 @@ class ClientService extends _root_1.default {
                 campaigns = client_campaigns;
             }
             ;
-            const limit = 15;
+            const limit = 20;
             const page_to_use = parseInt(page) || 1;
             const startIndex = (page_to_use - 1) * limit;
             const endIndex = page_to_use * limit;
