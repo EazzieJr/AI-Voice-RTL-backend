@@ -2507,7 +2507,7 @@ class ClientService extends _root_1.default {
             if (!response_data)
                 return res.status(400).json({ message: "No data found for the campaign" });
             ;
-            const result = [];
+            const sequences = [];
             if (response_data.length > 0) {
                 for (const data of response_data) {
                     const details = {
@@ -2518,14 +2518,16 @@ class ClientService extends _root_1.default {
                         bounced: data.bounce_count,
                         unsubscribed: data.unsubscribed_count,
                     };
-                    result.push(details);
+                    sequences.push(details);
                 }
                 ;
             }
             ;
             return res.status(200).json({
                 success: true,
-                result
+                result: {
+                    sequences
+                }
             });
         }
         catch (e) {

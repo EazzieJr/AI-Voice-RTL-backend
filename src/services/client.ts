@@ -3049,7 +3049,7 @@ class ClientService extends RootService {
                 positive_reply_count: number;
             };
 
-            const result = [];
+            const sequences = [];
 
             if (response_data.length > 0) {
                 for (const data of response_data as CampaignAnalytics[]) {
@@ -3062,13 +3062,15 @@ class ClientService extends RootService {
                         unsubscribed: data.unsubscribed_count,
                     };
 
-                    result.push(details);
+                    sequences.push(details);
                 };
             };
 
             return res.status(200).json({
                 success: true,
-                result
+                result: {
+                    sequences
+                }
             });
 
         } catch (e) {
