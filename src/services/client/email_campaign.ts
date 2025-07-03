@@ -11,7 +11,6 @@ import { GetWeekRangeDates } from "../../utils/dateQuery";
 class EmailCampaignService extends RootService {
     async email_reach_graph(req: AuthRequest, res: Response, next: NextFunction) {
         try {
-            console.log("In here");
             const clientId = req.user._id;
             const body = req.body;
 
@@ -25,19 +24,73 @@ class EmailCampaignService extends RootService {
 
             const { campaignId, startDate, endDate, timePeriod } = body;
 
+            interface CampaignObject {
+                id: number,
+                user_id: number,
+                created_at: string,
+                status: string,
+                name: string,
+                start_date: string,
+                end_date: string,
+                total_count: string,
+                sent_count: string,
+                skipped_count: string,
+                open_count: string,
+                click_count: string,
+                reply_count: string,
+                bounce_count: string,
+                unsubscribed_count: string,
+                failed_count: string,
+                stopped_count: string,
+                ln_connection_req_pending_count: string,
+                ln_connection_req_accepted_count: string,
+                ln_connection_req_skipped_sent_msg_count: string,
+                positive_reply_count: string
+            };
+
+            let result: Object[] = [];
+
             switch (timePeriod) {
                 case "weekly":
                     console.log("weekly data");
 
-                    const weekdates = GetWeekRangeDates(startDate, endDate);
-                    console.log("Week Dates:", weekdates);
+                    const weekdates = GetWeekRangeDates(startDate, endDate) as Array<{ monday: string; friday: string }>;
+
+                    for (const week of weekdates) {
+                        const start = week.monday;
+                        const end  = week.friday;
+
+                        const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
+
+                        const response = await axios.get(url);
+                        const response_data = response.data as CampaignObject;
+
+                        const data = {
+                            sent: response_data.sent_count,
+                            opened: response_data.open_count,
+                            clicked: response_data.click_count,
+                            replied: response_data.reply_count,
+                            bounced: response_data.bounce_count,
+                        };
+
+                        const graph_data = {
+                            x: `${week.monday} - ${week.friday}`,
+                            y: data,
+                        };
+
+                        result.push(graph_data);
+                        
+                    };
+
+                    break;
             };
 
-            // const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${startDate}&end_date=${endDate}`;
-            // const response = await axios.get(url);
-            // const response_data = response.data;
+            return res.status(200).json({
+                success: true,
+                message: "Email reach graph data fetched successfully",
+                result
+            });
 
-            // console.log("Response Data:", response_data);
         } catch (error) {
             console.error("Error in email_reach_graph:", error);
             next(error);
