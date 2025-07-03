@@ -5,7 +5,7 @@ import axios from "axios";
 import { EmailReachSchema } from "../../validations/client/email_campaign";
 import { userModel } from "../../models/userModel";
 import { DateOption } from "../../utils/types";
-import { GetWeekBounds, NormalizeWeekRange } from "../../utils/dateQuery";
+import { GetWeekRangeDates } from "../../utils/dateQuery";
 
 
 class EmailCampaignService extends RootService {
@@ -23,18 +23,15 @@ class EmailCampaignService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(404).json({ error: "User not found" });
 
-            const dateOption = req.body.dateOption as DateOption;
-            const { campaignId, startDate, endDate } = body;
+            const { campaignId, startDate, endDate, timePeriod } = body;
 
-            switch (dateOption) {
-                case DateOption.ThisWeek:+
-                    console.log("This week");
-                    const weekdates = NormalizeWeekRange(startDate, endDate);
-                    console.log("week dates: ", weekdates);
+            switch (timePeriod) {
+                case "weekly":
+                    console.log("weekly data");
 
-                    const dates = GetWeekBounds(startDate, endDate);
-                    console.log("Dates: ", dates);
-            }
+                    const weekdates = GetWeekRangeDates(startDate, endDate);
+                    console.log("Week Dates:", weekdates);
+            };
 
             // const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${startDate}&end_date=${endDate}`;
             // const response = await axios.get(url);

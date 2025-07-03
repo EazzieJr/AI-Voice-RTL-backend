@@ -1,70 +1,61 @@
 import { toZonedTime, format } from "date-fns-tz";
-import { subDays } from "date-fns";
+import { subDays, addDays } from "date-fns";
+import { start } from "repl";
 
 const timeZone = "America/Los_Angeles";
 const now = new Date();
 const zonedNow = toZonedTime(now, timeZone);
 
-export const NormalizeWeekRange = (start: string, end: string) => {
+export const GetWeekRangeDates = (start: Date, end: Date) => {
     try {
-        const startDate = new Date(start);
-        const endDate = new Date(end);
+        function normalizeToMonday(date: Date): Date {
+            const d = (date instanceof Date) ? date : new Date(date);
+            const day = d.getDay();
 
-        const startDay = startDate.getDay();
-        const endDay = endDate.getDay();
+            if (day === 0) return d;
 
-        console.log("Start Date:", startDay);
-        console.log("End Date:", endDay);
-        
-        if (startDay > 0) {
-            startDate.setDate(startDate.getDate() - startDay);
+            return subDays(d, day); // Adjust to the previous Monday
         };
 
-        if (endDay < 4) {
-            endDate.setDate(endDate.getDate() + (4 - endDay));
-        } else if (endDay > 4) {
-            endDate.setDate(endDate.getDate() + (endDay - 4));
+        function normalizeToFriday(date: Date): Date {
+            const d = (date instanceof Date) ? date : new Date(date);
+            const day = d.getDay();
+
+            if (day === 4) return d;
+
+            if (day < 4) {
+                return addDays(d, 4 - day); // Adjust to the previous Friday
+            }  else if (day > 4) {
+                return subDays(d, day - 4); // Adjust to the previous Friday
+            };
         };
 
-        return {
-            monday: startDate.toISOString().split("T")[0],
-            friday: endDate.toISOString().split("T")[0]
+        const startDate = normalizeToMonday(start);
+        const endDate = normalizeToFriday(end);
+
+        console.log("Day 1:", startDate);
+        console.log("Day 2:", endDate);
+
+        const result: { monday: string, friday: string }[] = [];
+
+        const currentMonday = new Date(startDate);
+
+        while (currentMonday <= endDate) {
+            const currentFriday = new Date(currentMonday);
+            currentFriday.setDate(currentMonday.getDate() + 4); // Get the Friday of the same week
+
+            result.push({
+                monday: currentMonday.toISOString().split("T")[0],
+                friday: currentFriday.toISOString().split("T")[0]
+            });
+
+            currentMonday.setDate(currentMonday.getDate() + 7); // Move to the next week
         };
+
+        return result;
 
     } catch (error) {
-        console.error("Error in CurrentWeekDates:", error);
-        return error;
-    };
-};
-
-export const GetWeekBounds = (start: string, end: string) => {
-    try {
-        const startDate = new Date(start);
-        const endDate = new Date(end);
-
-        const startDay = startDate.getDay();
-        const endDay = endDate.getDay();
-
-        console.log("Start Date:", startDay);
-        console.log("End Date:", endDay);
-
-        if (startDay < 4) {
-            startDate.setDate(startDate.getDate() + (4 - startDay));
-        } else if (startDay > 4) {
-            startDate.setDate(startDate.getDate() - (startDay - 4));
-        };
-
-        if (endDay > 0) {
-            endDate.setDate(endDate.getDate() - endDay);
-        };
-
-        return {
-            friday: startDate.toISOString().split("T")[0],
-            monday: endDate.toISOString().split("T")[0]
-        };
-
-    } catch (error) {
-        console.error("Error in GetWeekBounds:", error);
+        console.error("Error in GetWeekRangeDates:", error);
         return error;
     };
 };
