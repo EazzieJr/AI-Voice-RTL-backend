@@ -12,7 +12,6 @@ const dateQuery_1 = require("../../utils/dateQuery");
 class EmailCampaignService extends _root_1.default {
     async email_reach_graph(req, res, next) {
         try {
-            console.log("In here");
             const clientId = req.user._id;
             const body = req.body;
             const { error } = email_campaign_1.EmailReachSchema.validate(body, {
@@ -30,15 +29,12 @@ class EmailCampaignService extends _root_1.default {
                 case "weekly":
                     console.log("weekly data");
                     const weekdates = (0, dateQuery_1.GetWeekRangeDates)(startDate, endDate);
-                    console.log("Week Dates:", weekdates);
                     for (const week of weekdates) {
                         const start = week.monday;
                         const end = week.friday;
-                        console.log("Week Start:", start, "Week End:", end);
                         const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
                         const response = await axios_1.default.get(url);
                         const response_data = response.data;
-                        console.log("Response Data:", response_data);
                         const data = {
                             sent: response_data.sent_count,
                             opened: response_data.open_count,
@@ -50,11 +46,40 @@ class EmailCampaignService extends _root_1.default {
                             x: `${week.monday} - ${week.friday}`,
                             y: data,
                         };
-                        console.log("Graph Data:", graph_data);
                         result.push(graph_data);
                     }
                     ;
                     break;
+                case "monthly":
+                    console.log("monthly data");
+                    const monthDates = (0, dateQuery_1.GetMonthRangeDates)(startDate, endDate);
+                    console.log("monthDates:", monthDates);
+                    for (const month of monthDates) {
+                        const start = month.first;
+                        const end = month.last;
+                        const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
+                        const response = await axios_1.default.get(url);
+                        const response_data = response.data;
+                        const data = {
+                            sent: response_data.sent_count,
+                            opened: response_data.open_count,
+                            clicked: response_data.click_count,
+                            replied: response_data.reply_count,
+                            bounced: response_data.bounce_count,
+                        };
+                        const graph_data = {
+                            x: `${month.first} - ${month.last}`,
+                            y: data,
+                        };
+                        result.push(graph_data);
+                    }
+                    ;
+                    break;
+                default:
+                    return res.status(400).json({
+                        success: false,
+                        error: "Invalid timePeriod value"
+                    });
             }
             ;
             return res.status(200).json({
@@ -62,7 +87,6 @@ class EmailCampaignService extends _root_1.default {
                 message: "Email reach graph data fetched successfully",
                 result
             });
-            // console.log("Response Data:", response_data);
         }
         catch (error) {
             console.error("Error in email_reach_graph:", error);

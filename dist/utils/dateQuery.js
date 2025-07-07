@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GetWeekRangeDates = void 0;
+exports.GetMonthRangeDates = exports.GetWeekRangeDates = void 0;
 const date_fns_tz_1 = require("date-fns-tz");
 const date_fns_1 = require("date-fns");
 const timeZone = "America/Los_Angeles";
@@ -55,3 +55,41 @@ const GetWeekRangeDates = (start, end) => {
     ;
 };
 exports.GetWeekRangeDates = GetWeekRangeDates;
+const GetMonthRangeDates = (start, end) => {
+    try {
+        function getMonthDatesRange(start, end) {
+            const result = [];
+            const startMonth = (0, date_fns_1.startOfMonth)(start);
+            const endMonth = (0, date_fns_1.startOfMonth)(end);
+            if ((0, date_fns_1.isSameMonth)(startMonth, endMonth)) {
+                const startDate = (0, date_fns_tz_1.format)((0, date_fns_1.startOfMonth)(start), "yyyy-MM-dd", { timeZone });
+                const endDate = (0, date_fns_tz_1.format)((0, date_fns_1.endOfMonth)(start), "yyyy-MM-dd", { timeZone });
+                result.push({
+                    first: startDate,
+                    last: endDate
+                });
+                return result;
+            }
+            ;
+            let current = startMonth;
+            const finalMonth = (0, date_fns_1.startOfMonth)(end);
+            while (!(0, date_fns_1.isAfter)(current, finalMonth)) {
+                const first = (0, date_fns_tz_1.format)((0, date_fns_1.startOfMonth)(current), "yyyy-MM-dd", { timeZone });
+                const last = (0, date_fns_tz_1.format)((0, date_fns_1.endOfMonth)(current), "yyyy-MM-dd", { timeZone });
+                result.push({ first, last });
+                current = (0, date_fns_1.addMonths)(current, 1);
+            }
+            ;
+            return result;
+        }
+        ;
+        const months = getMonthDatesRange(start, end);
+        return months;
+    }
+    catch (error) {
+        console.error("Error in GetMonthRangeDates:", error);
+        return error;
+    }
+    ;
+};
+exports.GetMonthRangeDates = GetMonthRangeDates;

@@ -4,8 +4,7 @@ import { AuthRequest } from "../../middleware/authRequest";
 import axios from "axios";
 import { EmailReachSchema } from "../../validations/client/email_campaign";
 import { userModel } from "../../models/userModel";
-import { DateOption } from "../../utils/types";
-import { GetWeekRangeDates } from "../../utils/dateQuery";
+import { GetMonthRangeDates, GetWeekRangeDates } from "../../utils/dateQuery";
 
 
 class EmailCampaignService extends RootService {
@@ -83,6 +82,13 @@ class EmailCampaignService extends RootService {
                     };
 
                     break;
+
+                case "monthly":
+                    console.log("monthly data");
+
+                    const monthDates = GetMonthRangeDates(startDate, endDate) as Array<{ first: string; last: string }>;
+                    console.log("monthDates:", monthDates);
+
             };
 
             return res.status(200).json({

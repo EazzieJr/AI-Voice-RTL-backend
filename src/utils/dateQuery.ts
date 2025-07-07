@@ -1,6 +1,5 @@
 import { toZonedTime, format } from "date-fns-tz";
-import { subDays, addDays } from "date-fns";
-import { start } from "repl";
+import { subDays, addDays, addMonths, endOfMonth, startOfMonth, getDay, isBefore, isSameMonth, isAfter } from "date-fns";
 
 const timeZone = "America/Los_Angeles";
 const now = new Date();
@@ -56,6 +55,51 @@ export const GetWeekRangeDates = (start: Date, end: Date) => {
 
     } catch (error) {
         console.error("Error in GetWeekRangeDates:", error);
+        return error;
+    };
+};
+
+export const GetMonthRangeDates = (start: Date, end: Date) => {
+    try {
+        function getMonthDatesRange(start: Date, end: Date): { first: string, last: string }[] {
+            const result: { first: string, last: string }[] = [];
+
+            const startMonth = startOfMonth(start);
+            const endMonth = startOfMonth(end);
+
+            if (isSameMonth(startMonth, endMonth)) {
+                const startDate = format(startOfMonth(start), "yyyy-MM-dd", { timeZone });
+                const endDate = format(endOfMonth(start), "yyyy-MM-dd", { timeZone });
+
+                result.push({
+                    first: startDate,
+                    last: endDate
+                });
+
+                return result;
+            };
+
+            let current = startMonth;
+            const finalMonth = startOfMonth(end);
+
+            while (!isAfter(current, finalMonth)) {
+                const first = format(startOfMonth(current), "yyyy-MM-dd", { timeZone });
+                const last = format(endOfMonth(current), "yyyy-MM-dd", { timeZone });
+
+                result.push({ first, last });
+
+                current = addMonths(current, 1);
+            };
+
+            return result;
+        };
+
+        const months = getMonthDatesRange(start, end);
+
+        return months;
+
+    } catch (error) {
+        console.error("Error in GetMonthRangeDates:", error);
         return error;
     };
 };
