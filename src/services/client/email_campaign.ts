@@ -89,6 +89,40 @@ class EmailCampaignService extends RootService {
                     const monthDates = GetMonthRangeDates(startDate, endDate) as Array<{ first: string; last: string }>;
                     console.log("monthDates:", monthDates);
 
+                    for (const month of monthDates) {
+                        const start = month.first;
+                        const end = month.last;
+
+                        const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start}&end_date=${end}`;
+
+                        const response = await axios.get(url);
+                        const response_data = response.data as CampaignObject;
+
+                        const data = {
+                            sent: response_data.sent_count,
+                            opened: response_data.open_count,
+                            clicked: response_data.click_count,
+                            replied: response_data.reply_count,
+                            bounced: response_data.bounce_count,
+                        };
+
+                        const graph_data = {
+                            x: `${month.first} - ${month.last}`,
+                            y: data,
+                        };
+
+                        result.push(graph_data);
+
+                    };
+
+                    break;
+                
+                default:
+                    return res.status(400).json({
+                        success: false,
+                        error: "Invalid timePeriod value"
+                    });
+
             };
 
             return res.status(200).json({
