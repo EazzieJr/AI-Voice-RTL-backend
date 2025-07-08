@@ -49,11 +49,64 @@ class EmailCampaignService extends RootService {
 
             let result: Object[] = [];
 
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+
+            const msInDay = 24 * 60 * 60 * 1000;
+            const daysBetween = Math.floor((end.getTime() - start.getTime()) / msInDay) + 1;
+
+            console.log("Days between:", daysBetween);
+
+            if (daysBetween <= 14) {
+                console.log("Fetching daily data");
+                const dates: string[] = [];
+                let current = new Date(start);
+                while (current <= end) {
+                    dates.push(current.toISOString().split('T')[0]);
+                    current.setDate(current.getDate() + 1);
+                };
+
+                for (const date of dates) {
+                    const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${date}&end_date=${date}`;
+
+                    const response = await axios.get(url);
+                    const response_data = response.data as CampaignObject;
+
+                    const data = {
+                        sent: response_data.sent_count,
+                        opened: response_data.open_count,
+                        clicked: response_data.click_count,
+                        replied: response_data.reply_count,
+                        bounced: response_data.bounce_count,
+                    };
+
+                    const graph_data = {
+                        x: date,
+                        y: data,
+                    };
+
+                    result.push(graph_data);
+                };
+
+                console.log("Daily data fetched successfully");
+
+            } else {
+                console.log("Fetching weekly data");
+            };
+
+            return res.status(200).json({
+                success: true,
+                message: "Email reach graph data fetched successfully",
+                result
+            });
+
             switch (timePeriod) {
                 case "weekly":
                     console.log("weekly data");
 
                     const weekdates = GetWeekRangeDates(startDate, endDate) as Array<{ monday: string; friday: string }>;
+
+                    console.log("weekdates:", weekdates);
 
                     for (const week of weekdates) {
                         const start = week.monday;
