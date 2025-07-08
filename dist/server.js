@@ -83,10 +83,11 @@ const handler_1 = __importDefault(require("./middleware/handler"));
 const routes_1 = __importDefault(require("./routes"));
 const recordModel_1 = require("./models/recordModel");
 const eodScheduler_1 = require("./utils/eodScheduler");
+const jobRecovery_1 = require("./utils/jobRecovery");
 (0, contact_model_1.connectDb)();
 (0, eodScheduler_1.DailyReport)();
 (0, eodScheduler_1.WeeklyReport)();
-// restartScheduledJobs();
+(0, jobRecovery_1.restartScheduledJobs)();
 // const smee = new SmeeClient({
 //   source: process.env.SMEE_URL,
 //   target: "https://api.intuitiveagents.ai/webhook",

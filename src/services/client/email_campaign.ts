@@ -120,6 +120,11 @@ class EmailCampaignService extends RootService {
                 end_date = zonedNow.toISOString().split("T")[0];
             };
 
+            // Validate that end_date is not before start_date
+            if (new Date(end_date) < new Date(start_date)) {
+                return res.status(400).json({ message: "End date must not be before start date" });
+            }
+
             console.log("start_date: ", start_date);
             console.log("end_date: ", end_date);
 
@@ -165,10 +170,58 @@ class EmailCampaignService extends RootService {
                 };
             };
 
+            // Email Reach Graph Data
+            const msInDay = 24 * 60 * 60 * 1000;
+            const daysBetween = Math.floor((new Date(end_date).getTime() - new Date(start_date).getTime()) / msInDay) + 1;
+
+            console.log("Days between:", daysBetween);
+
+            let emailReachGraph: Object[] = [];
+
+            if (daysBetween <= 14) {
+                console.log("Fetching daily data");
+                const dates: string[] = [];
+                let current = new Date(start_date);
+                while (current <= new Date(end_date)) {
+                    dates.push(current.toISOString().split('T')[0]);
+                    current.setDate(current.getDate() + 1);
+                };
+
+                console.log("Dates to fetch:", dates);
+
+                for (const date of dates) {
+                    const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${date}&end_date=${date}`;
+
+                    const response = await axios.get(url);
+                    const response_data = response.data as CampaignAnalytics;
+
+                    const data = {
+                        sent: response_data.sent_count,
+                        opened: response_data.open_count,
+                        clicked: response_data.click_count,
+                        replied: response_data.reply_count,
+                        bounced: response_data.bounce_count,
+                    };
+
+                    const graph_data = {
+                        x: date,
+                        y: data,
+                    };
+
+                    emailReachGraph.push(graph_data);
+                };
+
+                console.log("Daily data fetched successfully: ", emailReachGraph);
+
+            } else {
+                console.log("Fetching weekly data");
+            };
+
             return res.status(200).json({
                 success: true,
                 result: {
-                    sequences
+                    sequences,
+                    emailReachGraph
                 }
             });
 
