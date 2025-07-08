@@ -13,7 +13,20 @@ export const GetWeekRangeDates = (start: Date, end: Date) => {
 
             if (day === 0) return d;
 
-            return subDays(d, day); // Adjust to the previous Monday
+            if (day > 0) {
+                return subDays(d, day); // Adjust to the previous Monday
+            };
+        };
+
+        function normalizeToSunday(date: Date): Date {
+            const d = (date instanceof Date) ? date : new Date(date);
+            const day = d.getDay();
+
+            if (day === 6) return d;
+
+            if (day < 6) {
+                return addDays(d, 6 - day); // Adjust to the next Sunday
+            };
         };
 
         function normalizeToFriday(date: Date): Date {
@@ -30,22 +43,22 @@ export const GetWeekRangeDates = (start: Date, end: Date) => {
         };
 
         const startDate = normalizeToMonday(start);
-        const endDate = normalizeToFriday(end);
+        const endDate = normalizeToSunday(end);
 
         console.log("Day 1:", startDate);
         console.log("Day 2:", endDate);
 
-        const result: { monday: string, friday: string }[] = [];
+        const result: { monday: string, sunday: string }[] = [];
 
         const currentMonday = new Date(startDate);
 
         while (currentMonday <= endDate) {
-            const currentFriday = new Date(currentMonday);
-            currentFriday.setDate(currentMonday.getDate() + 4); // Get the Friday of the same week
+            const currentSunday = new Date(currentMonday);
+            currentSunday.setDate(currentMonday.getDate() + 6); // Get the Sunday of the same week
 
             result.push({
                 monday: currentMonday.toISOString().split("T")[0],
-                friday: currentFriday.toISOString().split("T")[0]
+                sunday: currentSunday.toISOString().split("T")[0]
             });
 
             currentMonday.setDate(currentMonday.getDate() + 7); // Move to the next week

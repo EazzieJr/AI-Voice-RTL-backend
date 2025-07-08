@@ -215,6 +215,10 @@ class EmailCampaignService extends RootService {
 
             } else {
                 console.log("Fetching weekly data");
+
+                const weekdates = GetWeekRangeDates(new Date(start_date), new Date(end_date)) as Array<{ monday: string; sunday: string }>;
+
+                console.log("Week dates:", weekdates);
             };
 
             return res.status(200).json({

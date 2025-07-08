@@ -13,7 +13,21 @@ const GetWeekRangeDates = (start, end) => {
             const day = d.getDay();
             if (day === 0)
                 return d;
-            return (0, date_fns_1.subDays)(d, day); // Adjust to the previous Monday
+            if (day > 0) {
+                return (0, date_fns_1.subDays)(d, day); // Adjust to the previous Monday
+            }
+            ;
+        }
+        ;
+        function normalizeToSunday(date) {
+            const d = (date instanceof Date) ? date : new Date(date);
+            const day = d.getDay();
+            if (day === 6)
+                return d;
+            if (day < 6) {
+                return (0, date_fns_1.addDays)(d, 6 - day); // Adjust to the next Sunday
+            }
+            ;
         }
         ;
         function normalizeToFriday(date) {
@@ -31,17 +45,19 @@ const GetWeekRangeDates = (start, end) => {
         }
         ;
         const startDate = normalizeToMonday(start);
-        const endDate = normalizeToFriday(end);
+        const endDate = normalizeToSunday(end);
         console.log("Day 1:", startDate);
         console.log("Day 2:", endDate);
         const result = [];
         const currentMonday = new Date(startDate);
         while (currentMonday <= endDate) {
-            const currentFriday = new Date(currentMonday);
-            currentFriday.setDate(currentMonday.getDate() + 4); // Get the Friday of the same week
+            const currentSunday = new Date(currentMonday);
+            currentSunday.setDate(currentMonday.getDate() + 6); // Get the Sunday of the same week
+            // const currentFriday = new Date(currentMonday);
+            // currentFriday.setDate(currentMonday.getDate() + 4); // Get the Friday of the same week
             result.push({
                 monday: currentMonday.toISOString().split("T")[0],
-                friday: currentFriday.toISOString().split("T")[0]
+                sunday: currentSunday.toISOString().split("T")[0]
             });
             currentMonday.setDate(currentMonday.getDate() + 7); // Move to the next week
         }

@@ -171,6 +171,8 @@ class EmailCampaignService extends _root_1.default {
             }
             else {
                 console.log("Fetching weekly data");
+                const weekdates = (0, dateQuery_1.GetWeekRangeDates)(new Date(start_date), new Date(end_date));
+                console.log("Week dates:", weekdates);
             }
             ;
             return res.status(200).json({
