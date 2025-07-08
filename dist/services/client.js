@@ -2483,60 +2483,6 @@ class ClientService extends _root_1.default {
         ;
     }
     ;
-    async campaign_details_analytics(req, res, next) {
-        try {
-            const clientId = req.user._id;
-            const campaignId = req.params.campaignId;
-            const start_date = req.query.start_date;
-            if (campaignId === null || campaignId === undefined || !campaignId)
-                return res.status(400).json({ message: "CampaignId is required" });
-            if (!start_date)
-                return res.status(400).json({ message: "Start date is required" });
-            const check_user = await userModel_1.userModel.findById(clientId);
-            if (!check_user)
-                return res.status(400).json({ error: "User not found" });
-            const timeZone = "America/Los_Angeles";
-            const now = new Date();
-            const zonedNow = (0, date_fns_tz_1.toZonedTime)(now, timeZone);
-            const end_date = zonedNow.toISOString().split("T")[0];
-            console.log("start_date: ", start_date);
-            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start_date}&end_date=${end_date}`;
-            const response = await axios_1.default.get(url);
-            const response_details = response.data;
-            const response_data = response_details.data;
-            if (!response_data)
-                return res.status(400).json({ message: "No data found for the campaign" });
-            ;
-            const sequences = [];
-            if (response_data.length > 0) {
-                for (const data of response_data) {
-                    const details = {
-                        sequenceId: data.email_campaign_seq_id,
-                        sentCount: data.sent_count,
-                        reply: data.reply_count,
-                        positiveReplies: data.positive_reply_count,
-                        bounced: data.bounce_count,
-                        unsubscribed: data.unsubscribed_count,
-                    };
-                    sequences.push(details);
-                }
-                ;
-            }
-            ;
-            return res.status(200).json({
-                success: true,
-                result: {
-                    sequences
-                }
-            });
-        }
-        catch (e) {
-            console.error("Error fetching single campaign analytics: " + e);
-            next(e);
-        }
-        ;
-    }
-    ;
 }
 ;
 exports.client_service = new ClientService();

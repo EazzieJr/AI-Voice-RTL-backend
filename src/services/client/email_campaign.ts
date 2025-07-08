@@ -5,9 +5,84 @@ import axios from "axios";
 import { EmailReachSchema } from "../../validations/client/email_campaign";
 import { userModel } from "../../models/userModel";
 import { GetMonthRangeDates, GetWeekRangeDates } from "../../utils/dateQuery";
+import { toZonedTime } from "date-fns-tz";
 
 
 class EmailCampaignService extends RootService {
+    async campaign_details_analytics(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+            const campaignId = req.params.campaignId;
+            const start_date = req.query.start_date as string;
+
+            if (campaignId === null || campaignId === undefined || !campaignId) return res.status(400).json({ message: "CampaignId is required" });
+            if (!start_date) return res.status(400).json({ message: "Start date is required" });
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const timeZone = "America/Los_Angeles";
+            const now = new Date();
+            const zonedNow = toZonedTime(now, timeZone);
+
+            const end_date = zonedNow.toISOString().split("T")[0];
+
+            console.log("start_date: ", start_date);
+            const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/sequence-analytics?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${start_date}&end_date=${end_date}`;
+
+            const response = await axios.get(url);
+            const response_details = response.data;
+            const response_data = response_details.data;
+
+            if (!response_data) return res.status(400).json({ message: "No data found for the campaign" });
+
+            interface CampaignAnalytics {
+                email_campaign_seq_id: number;
+                sent_count: number;
+                skipped_count: number;
+                open_count: number;
+                click_count: number;
+                reply_count: number;
+                bounce_count: number;
+                unsubscribed_count: number;
+                failed_count: number;
+                stopped_count: number;
+                ln_connection_req_pending_count: number;
+                ln_connection_req_accepted_count: number;
+                ln_connection_req_skipped_sent_msg_count: number;
+                positive_reply_count: number;
+            };
+
+            const sequences = [];
+
+            if (response_data.length > 0) {
+                for (const data of response_data as CampaignAnalytics[]) {
+                    const details = {
+                        sequenceId: data.email_campaign_seq_id,
+                        sentCount: data.sent_count,
+                        reply: data.reply_count,
+                        positiveReplies: data.positive_reply_count,
+                        bounced: data.bounce_count,
+                        unsubscribed: data.unsubscribed_count,
+                    };
+
+                    sequences.push(details);
+                };
+            };
+
+            return res.status(200).json({
+                success: true,
+                result: {
+                    sequences
+                }
+            });
+
+        } catch (e) {
+            console.error("Error fetching single campaign analytics: " + e);
+            next(e);
+        };
+    };
+
     async email_reach_graph(req: AuthRequest, res: Response, next: NextFunction) {
         try {
             const clientId = req.user._id;

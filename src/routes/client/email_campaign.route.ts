@@ -8,6 +8,8 @@ const authenticate = AuthMiddleware.authenticate;
 const router = express.Router();
 
 router
+    .get("/campaign-details-analytics/:campaignId", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => email_campaign_service.campaign_details_analytics(req, res, next))
+    
     .post("/email-reach-graph", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => {
         email_campaign_service.email_reach_graph(req, res, next);
     });

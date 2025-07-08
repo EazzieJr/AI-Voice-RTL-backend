@@ -43,6 +43,5 @@ multerConfig_1.upload.single("csvFile"), (req, res, next) => client_1.client_ser
     .post("/add-notes", authenticate, (req, res, next) => client_1.client_service.add_notes(req, res, next))
     .post("/voice-kpi", authenticate, (req, res, next) => client_1.client_service.voice_kpi(req, res, next))
     .post("/export-kpi", authenticate, (req, res, next) => client_1.client_service.export_kpi(req, res, next))
-    .get("/details", authenticate, (req, res, next) => client_1.client_service.client_details(req, res, next))
-    .get("/campaign-details-analytics/:campaignId", authenticate, (req, res, next) => client_1.client_service.campaign_details_analytics(req, res, next));
+    .get("/details", authenticate, (req, res, next) => client_1.client_service.client_details(req, res, next));
 exports.default = router;
