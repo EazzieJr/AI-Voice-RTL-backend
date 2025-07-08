@@ -124,7 +124,7 @@ export const DailyReport = () => {
                 const appointments = await callHistoryModel.countDocuments({ agentId, date, dial_status: "appt-scheduled" });
 
                 // Fetching Email Data
-                const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`
+                const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
 
                 const clients = await axios.get(clients_url);
                 const clients_data = clients.data;
@@ -294,30 +294,10 @@ export const WeeklyReport = () => {
             console.log("Users to check: ", usersToCheck);
 
             for (const user of usersToCheck) {
-                const { name, group, agents } = user;
-                const agentId = agents[0].agentId; 
-                let email;
+                const { name, group, agents, autoEmail } = user;
+                const agentId = agents[0].agentId;
 
-                if (group === "ARS") {
-                    email = "ars@tvagai.com";
-                } else if (group === "DME") {
-                    email = "dme@tvagai.com";
-                } else if (group === "ESG") {
-                    email = "esg@tvagai.com";
-                } else if (group === "KSA") {
-                    email = "ksa@tvagai.com";
-                } else if (group === "NFS") {
-                    email = "nfs@tvagai.com";
-                } else if (group === "CWS") {
-                    email = "cws@tvagai.com";
-                } else if (group === "RWY") {
-                    email = "runway@tvagai.com";
-                } else if (group === "CPA") {
-                    email = "clearpath@tvagai.com";
-                } else {
-                    console.log("email is heere: ", user.email);
-                    email: user.email;
-                };
+                const email = autoEmail || user.email;
 
                 // Fetching Voice Data
                 const stats = await DailyStatsModel.aggregate([
@@ -381,6 +361,93 @@ export const WeeklyReport = () => {
                 });
                 const appointments = await callHistoryModel.countDocuments({ agentId, date: { $in: dates }, dial_status: "appt-scheduled" });
 
+                // Fetching Email Data
+                const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+                const clients = await axios.get(clients_url);
+                const clients_data = clients.data;
+
+                let foundClient;
+
+                interface ClientObject {
+                    id: number,
+                    name: string,
+                    email: string,
+                    uuid: string,
+                    created_at: string,
+                    user_id: number,
+                    logo: string,
+                    logo_url: any,
+                    client_permision: object[]
+                };
+
+                let activeCampaigns;
+                let totalAnalytics: any;
+
+                foundClient = clients_data.find((client: ClientObject) => client.logo === name);
+
+                if (!foundClient) {
+                    console.log("Client not found for logo: ", name);
+                } else {
+                    const { id } = foundClient;
+
+                    const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+
+                    const campaign = await axios.get(url);
+                    const all_campaigns = campaign.data;
+
+                    const client_campaigns = all_campaigns.filter((campaign: any) => campaign.client_id === id && campaign.status === "ACTIVE");
+                    console.log("client_campaigns: ", client_campaigns);
+                    activeCampaigns = client_campaigns.length;
+
+                    const campaignIds = client_campaigns.map((campaign: any) => campaign.id);
+
+                    interface CampaignAnalytics {
+                        id: number,
+                        user_id: number,
+                        created_at: string,
+                        status: string,
+                        name: string,
+                        start_date: string,
+                        end_date: string,
+                        total_count: string,
+                        sent_count: string,
+                        skipped_count: string,
+                        open_count: string,
+                        click_count: string,
+                        reply_count: string,
+                        bounce_count: string,
+                        unsubscribed_count: string,
+                        failed_count: string,
+                        stopped_count: string,
+                        ln_connection_req_pending_count: string,
+                        ln_connection_req_accepted_count: string,
+                        ln_connection_req_skipped_sent_msg_count: string,
+                        positive_reply_count: string
+                    };
+
+                    let campaignAnalytics: CampaignAnalytics[] = [];
+                    for (const campaignId of campaignIds) {
+                        const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${dates[0]}&end_date=${dates[4]}`;
+
+                        const analytics = await axios.get(url);
+                        const campaign_analytics = analytics.data;
+
+                        campaignAnalytics.push(campaign_analytics);
+
+                    };
+
+                    totalAnalytics = campaignAnalytics.reduce((totals, analytics) => {
+                        const { sent_count, bounce_count, reply_count, positive_reply_count } = analytics;
+                        totals.sentCount += Number(sent_count || 0);
+                        totals.bounceCount += Number(bounce_count || 0);
+                        totals.replyCount += Number(reply_count || 0);
+                        totals.positiveReplyCount += Number(positive_reply_count || 0);
+
+                        return totals;
+                    }, { sentCount: 0, openCount: 0, replyCount: 0, bounceCount: 0, positiveReplyCount: 0 });
+                };
+
                 const body_to_send = {
                     name,
                     email,
@@ -399,10 +466,16 @@ export const WeeklyReport = () => {
                             minutesUsed,
                             listsCalled,
                             scheduledTime: scheduleTime
+                        },
+                        email: {
+                            activeCampaigns: activeCampaigns || 0,
+                            sent: totalAnalytics?.sentCount || 0,
+                            replied: totalAnalytics?.replyCount || 0,
+                            positiveReplies: totalAnalytics?.positiveReplyCount || 0,
+                            bounced: totalAnalytics?.bounceCount || 0,
                         }
                     }
-                }
-
+                };
 
                 console.log("body: ", body_to_send);
             }

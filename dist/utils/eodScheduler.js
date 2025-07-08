@@ -246,38 +246,9 @@ const WeeklyReport = () => {
             ;
             console.log("Users to check: ", usersToCheck);
             for (const user of usersToCheck) {
-                const { name, group, agents } = user;
+                const { name, group, agents, autoEmail } = user;
                 const agentId = agents[0].agentId;
-                let email;
-                if (group === "ARS") {
-                    email = "ars@tvagai.com";
-                }
-                else if (group === "DME") {
-                    email = "dme@tvagai.com";
-                }
-                else if (group === "ESG") {
-                    email = "esg@tvagai.com";
-                }
-                else if (group === "KSA") {
-                    email = "ksa@tvagai.com";
-                }
-                else if (group === "NFS") {
-                    email = "nfs@tvagai.com";
-                }
-                else if (group === "CWS") {
-                    email = "cws@tvagai.com";
-                }
-                else if (group === "RWY") {
-                    email = "runway@tvagai.com";
-                }
-                else if (group === "CPA") {
-                    email = "clearpath@tvagai.com";
-                }
-                else {
-                    console.log("email is heere: ", user.email);
-                    email: user.email;
-                }
-                ;
+                const email = autoEmail || user.email;
                 // Fetching Voice Data
                 const stats = await logModel_1.DailyStatsModel.aggregate([
                     {
@@ -333,6 +304,46 @@ const WeeklyReport = () => {
                     }
                 });
                 const appointments = await historyModel_1.default.countDocuments({ agentId, date: { $in: dates }, dial_status: "appt-scheduled" });
+                // Fetching Email Data
+                const clients_url = `${process.env.SMART_LEAD_URL}/client/?api_key=${process.env.SMART_LEAD_API_KEY}`;
+                const clients = await axios_1.default.get(clients_url);
+                const clients_data = clients.data;
+                let foundClient;
+                ;
+                let activeCampaigns;
+                let totalAnalytics;
+                foundClient = clients_data.find((client) => client.logo === name);
+                if (!foundClient) {
+                    console.log("Client not found for logo: ", name);
+                }
+                else {
+                    const { id } = foundClient;
+                    const url = `${process.env.SMART_LEAD_URL}/campaigns?api_key=${process.env.SMART_LEAD_API_KEY}`;
+                    const campaign = await axios_1.default.get(url);
+                    const all_campaigns = campaign.data;
+                    const client_campaigns = all_campaigns.filter((campaign) => campaign.client_id === id && campaign.status === "ACTIVE");
+                    console.log("client_campaigns: ", client_campaigns);
+                    activeCampaigns = client_campaigns.length;
+                    const campaignIds = client_campaigns.map((campaign) => campaign.id);
+                    ;
+                    let campaignAnalytics = [];
+                    for (const campaignId of campaignIds) {
+                        const url = `${process.env.SMART_LEAD_URL}/campaigns/${campaignId}/top-level-analytics-by-date?api_key=${process.env.SMART_LEAD_API_KEY}&start_date=${dates[0]}&end_date=${dates[4]}`;
+                        const analytics = await axios_1.default.get(url);
+                        const campaign_analytics = analytics.data;
+                        campaignAnalytics.push(campaign_analytics);
+                    }
+                    ;
+                    totalAnalytics = campaignAnalytics.reduce((totals, analytics) => {
+                        const { sent_count, bounce_count, reply_count, positive_reply_count } = analytics;
+                        totals.sentCount += Number(sent_count || 0);
+                        totals.bounceCount += Number(bounce_count || 0);
+                        totals.replyCount += Number(reply_count || 0);
+                        totals.positiveReplyCount += Number(positive_reply_count || 0);
+                        return totals;
+                    }, { sentCount: 0, openCount: 0, replyCount: 0, bounceCount: 0, positiveReplyCount: 0 });
+                }
+                ;
                 const body_to_send = {
                     name,
                     email,
@@ -351,6 +362,13 @@ const WeeklyReport = () => {
                             minutesUsed,
                             listsCalled,
                             scheduledTime: scheduleTime
+                        },
+                        email: {
+                            activeCampaigns: activeCampaigns || 0,
+                            sent: (totalAnalytics === null || totalAnalytics === void 0 ? void 0 : totalAnalytics.sentCount) || 0,
+                            replied: (totalAnalytics === null || totalAnalytics === void 0 ? void 0 : totalAnalytics.replyCount) || 0,
+                            positiveReplies: (totalAnalytics === null || totalAnalytics === void 0 ? void 0 : totalAnalytics.positiveReplyCount) || 0,
+                            bounced: (totalAnalytics === null || totalAnalytics === void 0 ? void 0 : totalAnalytics.bounceCount) || 0,
                         }
                     }
                 };
