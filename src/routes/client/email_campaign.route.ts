@@ -10,8 +10,4 @@ const router = express.Router();
 router
     .post("/campaign-details-analytics", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => email_campaign_service.campaign_details_analytics(req, res, next))
     
-    .post("/email-reach-graph", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => {
-        email_campaign_service.email_reach_graph(req, res, next);
-    });
-
 export default router;

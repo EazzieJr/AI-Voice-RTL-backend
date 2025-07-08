@@ -53,8 +53,6 @@ const GetWeekRangeDates = (start, end) => {
         while (currentMonday <= endDate) {
             const currentSunday = new Date(currentMonday);
             currentSunday.setDate(currentMonday.getDate() + 6); // Get the Sunday of the same week
-            // const currentFriday = new Date(currentMonday);
-            // currentFriday.setDate(currentMonday.getDate() + 4); // Get the Friday of the same week
             result.push({
                 monday: currentMonday.toISOString().split("T")[0],
                 sunday: currentSunday.toISOString().split("T")[0]
