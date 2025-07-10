@@ -172,6 +172,7 @@ class ClientService extends RootService {
             });
 
             let conversionRate;
+            let averageCallDuration;
 
             console.log("Appointments: ", totalAppointments);
 
@@ -213,13 +214,22 @@ class ClientService extends RootService {
 
             const answerRate = (totalAnsweredCalls / totalCalls) * 100;
 
-            console.log("Total answered calls: ", totalAnsweredCalls);
-            console.log("Total Appointments: ", totalAppointments);
-            console.log("converse: ", totalAppointments / totalAnsweredCalls);
 
             if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
+
                 conversionRate = (totalAppointments / totalAnsweredCalls) * 100 || 0;
                 console.log("Conversion Rate: ", conversionRate);
+
+                if (totalAnsweredCalls > 0) {
+                    const totalDuration = stats[0]?.totalCallDuration || 0;
+                    const averageDuration = totalDuration / totalAnsweredCalls;
+
+                    averageCallDuration = convertMsToMinSec(averageDuration);
+                    console.log("Average Call Duration: ", averageCallDuration);
+
+                } else {
+                    averageCallDuration = "00:00";
+                };
             };
 
             // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
@@ -245,6 +255,7 @@ class ClientService extends RootService {
                 totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
                 totalCalls,
                 ...(conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` }),
+                ...(averageCallDuration !== undefined && { averageCallDuration }),
                 // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
                 // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
                 // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,

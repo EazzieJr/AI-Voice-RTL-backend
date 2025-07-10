@@ -30,7 +30,7 @@ const csv_writer_1 = require("csv-writer");
 const path_1 = __importDefault(require("path"));
 class ClientService extends _root_1.default {
     async dashboard_stats(req, res, next) {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e, _f;
         try {
             const clientId = req.user._id;
             const body = req.body;
@@ -146,6 +146,7 @@ class ClientService extends _root_1.default {
             const totalAnsweredCalls = await contact_model_1.contactModel.countDocuments(Object.assign({ agentId: { $in: agentIds }, isDeleted: false, dial_status: types_1.callstatusenum.CALLED }, dateFilter));
             const totalAppointments = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, userSentiment: "scheduled" }, date_to_check));
             let conversionRate;
+            let averageCallDuration;
             console.log("Appointments: ", totalAppointments);
             const stats = await logModel_1.DailyStatsModel.aggregate([
                 {
@@ -167,6 +168,7 @@ class ClientService extends _root_1.default {
                     }
                 }
             ]);
+            console.log("appointments: ", (_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalAppointment);
             function convertMsToMinSec(ms) {
                 const totalSeconds = Math.floor(ms / 1000);
                 const minutes = Math.floor(totalSeconds / 60);
@@ -174,28 +176,36 @@ class ClientService extends _root_1.default {
                 return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
             }
             ;
-            const combinedCallDuration = convertMsToMinSec(((_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalCallDuration) || 0);
-            const totalCalls = ((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCalls) || 0;
-            // const totalCalls = await callHistoryModel.countDocuments({ agentId: { $in: agentIds } });
+            const combinedCallDuration = convertMsToMinSec(((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCallDuration) || 0);
+            const totalCalls = ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCalls) || 0;
             const answerRate = (totalAnsweredCalls / totalCalls) * 100;
-            console.log("Total answered calls: ", totalAnsweredCalls);
-            console.log("Total Appointments: ", totalAppointments);
-            console.log("converse: ", totalAppointments / totalAnsweredCalls);
+            console.log("Total call duration: ", (_d = stats[0]) === null || _d === void 0 ? void 0 : _d.totalCallDuration);
+            console.log("total answered calls: ", totalAnsweredCalls);
             if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
                 conversionRate = (totalAppointments / totalAnsweredCalls) * 100 || 0;
                 console.log("Conversion Rate: ", conversionRate);
+                if (totalAnsweredCalls > 0) {
+                    const totalDuration = ((_e = stats[0]) === null || _e === void 0 ? void 0 : _e.totalCallDuration) || 0;
+                    const averageDuration = totalDuration / totalAnsweredCalls;
+                    averageCallDuration = convertMsToMinSec(averageDuration);
+                    console.log("Average Call Duration: ", averageCallDuration);
+                }
+                else {
+                    averageCallDuration = "00:00";
+                }
+                ;
             }
             ;
             // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
             const automatedAnswers = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
             console.log("automatedAnswers: ", automatedAnswers);
             const automatedRate = (automatedAnswers / totalCalls) * 100;
-            return res.status(200).json(Object.assign({ totalContactForAgent,
+            return res.status(200).json(Object.assign(Object.assign({ totalContactForAgent,
                 totalAnsweredCalls, answerRate: `${answerRate.toFixed(2)}%`, 
                 // totalNotCalledForAgent,
                 callDuration: combinedCallDuration, totalAutomatedAnswers: automatedAnswers, automatedRate: `${automatedRate.toFixed(2)}%`, 
                 // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
-                totalAppointment: totalAppointments, totalCallsTransferred: ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCallsTransffered) || 0, totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })));
+                totalAppointment: totalAppointments, totalCallsTransferred: ((_f = stats[0]) === null || _f === void 0 ? void 0 : _f.totalCallsTransffered) || 0, totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })));
         }
         catch (error) {
             console.error("Error fetching dashboard stats: ", error);
