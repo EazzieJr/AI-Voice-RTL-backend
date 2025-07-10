@@ -145,6 +145,7 @@ class ClientService extends _root_1.default {
             // });
             const totalAnsweredCalls = await contact_model_1.contactModel.countDocuments(Object.assign({ agentId: { $in: agentIds }, isDeleted: false, dial_status: types_1.callstatusenum.CALLED }, dateFilter));
             const totalAppointments = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, userSentiment: "scheduled" }, date_to_check));
+            let conversionRate;
             console.log("Appointments: ", totalAppointments);
             const stats = await logModel_1.DailyStatsModel.aggregate([
                 {
@@ -172,31 +173,29 @@ class ClientService extends _root_1.default {
                 const seconds = totalSeconds % 60;
                 return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
             }
+            ;
             const combinedCallDuration = convertMsToMinSec(((_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalCallDuration) || 0);
             const totalCalls = ((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCalls) || 0;
             // const totalCalls = await callHistoryModel.countDocuments({ agentId: { $in: agentIds } });
             const answerRate = (totalAnsweredCalls / totalCalls) * 100;
+            console.log("Total answered calls: ", totalAnsweredCalls);
+            console.log("Total Appointments: ", totalAppointments);
+            console.log("converse: ", totalAppointments / totalAnsweredCalls);
+            if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
+                conversionRate = (totalAppointments / totalAnsweredCalls) * 100 || 0;
+                console.log("Conversion Rate: ", conversionRate);
+            }
+            ;
             // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
             const automatedAnswers = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
             console.log("automatedAnswers: ", automatedAnswers);
             const automatedRate = (automatedAnswers / totalCalls) * 100;
-            return res.status(200).json({
-                totalContactForAgent,
-                totalAnsweredCalls,
-                answerRate: `${answerRate.toFixed(2)}%`,
+            return res.status(200).json(Object.assign({ totalContactForAgent,
+                totalAnsweredCalls, answerRate: `${answerRate.toFixed(2)}%`, 
                 // totalNotCalledForAgent,
-                callDuration: combinedCallDuration,
-                totalAutomatedAnswers: automatedAnswers,
-                automatedRate: `${automatedRate.toFixed(2)}%`,
+                callDuration: combinedCallDuration, totalAutomatedAnswers: automatedAnswers, automatedRate: `${automatedRate.toFixed(2)}%`, 
                 // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
-                totalAppointment: totalAppointments,
-                totalCallsTransferred: ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCallsTransffered) || 0,
-                totalCalls,
-                // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
-                // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
-                // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
-                // totalCallInactivity: stats[0]?.totalCallInactivity || 0
-            });
+                totalAppointment: totalAppointments, totalCallsTransferred: ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCallsTransffered) || 0, totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })));
         }
         catch (error) {
             console.error("Error fetching dashboard stats: ", error);

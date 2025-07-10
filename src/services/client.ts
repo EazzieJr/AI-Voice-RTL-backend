@@ -171,6 +171,8 @@ class ClientService extends RootService {
                 ...date_to_check
             });
 
+            let conversionRate;
+
             console.log("Appointments: ", totalAppointments);
 
             const stats = await DailyStatsModel.aggregate([
@@ -203,13 +205,22 @@ class ClientService extends RootService {
                 const seconds = totalSeconds % 60;
 
                 return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-            }
+            };
 
             const combinedCallDuration = convertMsToMinSec(stats[0]?.totalCallDuration || 0);
 
             const totalCalls = stats[0]?.totalCalls || 0;
-            // const totalCalls = await callHistoryModel.countDocuments({ agentId: { $in: agentIds } });
+
             const answerRate = (totalAnsweredCalls / totalCalls) * 100;
+
+            console.log("Total answered calls: ", totalAnsweredCalls);
+            console.log("Total Appointments: ", totalAppointments);
+            console.log("converse: ", totalAppointments / totalAnsweredCalls);
+
+            if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
+                conversionRate = (totalAppointments / totalAnsweredCalls) * 100 || 0;
+                console.log("Conversion Rate: ", conversionRate);
+            };
 
             // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
             const automatedAnswers = await callHistoryModel.countDocuments({
@@ -233,6 +244,7 @@ class ClientService extends RootService {
                 totalAppointment: totalAppointments,
                 totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
                 totalCalls,
+                ...(conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` }),
                 // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
                 // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
                 // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
