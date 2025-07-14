@@ -1113,14 +1113,14 @@ class CallService extends _root_1.default {
                 });
             }
             else if (event === "call_started") {
-                console.log("inbound call started event: ", call_inbound);
+                console.log("inbound call started event: ", payload);
                 await this.call_started(payload);
             }
             else if (event === "call_ended") {
-                console.log("inbound call ended event: ", call_inbound);
+                console.log("inbound call ended event: ", payload);
             }
             else if (event === "call_analyzed") {
-                console.log("inbound call analyzed event: ", call_inbound);
+                console.log("inbound call analyzed event: ", payload);
                 await this.call_analyzed(payload, todayString, todayStringWithTime, time);
             }
             else {
