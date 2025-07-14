@@ -1357,6 +1357,8 @@ class CallService extends RootService {
                     event_gotten: event
                 });
             };
+
+            return res.status(200).send("Webhook received successfully");
         } catch (e) {
             console.error("Error with incoming call webhook: " + e);
             next(e);

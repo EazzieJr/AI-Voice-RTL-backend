@@ -1130,6 +1130,7 @@ class CallService extends _root_1.default {
                 });
             }
             ;
+            return res.status(200).send("Webhook received successfully");
         }
         catch (e) {
             console.error("Error with incoming call webhook: " + e);
