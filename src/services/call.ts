@@ -377,6 +377,289 @@ class CallService extends RootService {
         };
     };
 
+    // async call_analyzed(payload: any, todayString: string, todaysDateForDatesCalled: any, time: any) {
+    //     try {
+    //         const { event, call } = payload;
+
+    //         const { 
+    //             agent_id, 
+    //             call_id,
+    //             call_type,
+    //             call_status,
+    //             start_timestamp,
+    //             end_timestamp,
+    //             disconnection_reason,
+    //             from_number, 
+    //             to_number,
+    //             direction,
+    //             transcript,
+    //             duration_ms,
+    //             recording_url,
+    //             public_log_url,
+    //             call_analysis, 
+    //             retell_llm_dynamic_variables,
+    //             transcript_object,
+    //             transcript_with_tool_calls 
+    //         } = call;
+
+    //         const fetch_client = await userModel.findOne({ 'agents.agentId': agent_id });
+
+    //         let analyzedTranscriptForStatus;
+    //         let callStatus;
+    //         let sentimentStatus;
+    //         let callOutcome;
+    //         let statsUpdate: any = { $inc: {} };
+
+    //         function convertMsToHourMinSec(ms: number): string {
+    //             const totalSeconds = Math.floor(ms / 1000);
+    //             const hours = Math.floor(totalSeconds / 3600);
+    //             const minutes = Math.floor((totalSeconds % 3600) / 60);
+    //             const seconds = totalSeconds % 60;
+
+    //             return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    //         };
+
+    //         if (event === "call_analyzed") {
+    //             console.log("inside analyzed function");
+
+    //             const call_failed = disconnection_reason === "dial_failed";
+    //             const call_transferred = disconnection_reason === "call_transfer";
+    //             const dial_no_answer = disconnection_reason === "dial_no_answer";
+    //             const call_inactivity = disconnection_reason === 'inactivity';
+    //             const call_hangedup = disconnection_reason === "user_hangup" || disconnection_reason === "agent_hangup";
+    //             const call_error = disconnection_reason === "error_inbound_webhook" || "error_llm_websocket_open" || "error_llm_websocket_lost_connection" || "error_llm_websocket_runtime" || "error_llm_websocket_corrupt_payload" || "error_frontend_corrupted_payload" || "error_twilio" || "error_no_audio_received" || "error_asr" || "error_retell" || "error_unknown" || "error_user_not_joined";
+
+    //             analyzedTranscriptForStatus = await reviewTranscript(transcript);
+
+    //             const is_call_scheduled = analyzedTranscriptForStatus.message.content === "scheduled";
+    //             const is_machine = analyzedTranscriptForStatus.message.content === "voicemail";
+    //             const is_ivr = analyzedTranscriptForStatus.message.content === "ivr";
+    //             const is_dnc = analyzedTranscriptForStatus.message.content === "dnc";
+    //             const is_callback = analyzedTranscriptForStatus.message.content === "call-back";
+
+    //             const is_neutral =  call_analysis.user_sentiment === "Neutral";
+    //             const is_unknown =  call_analysis.user_sentiment === "Unknown";
+    //             const is_positive = call_analysis.user_sentiment === "Positive";
+    //             const is_negative = call_analysis.user_sentiment === "Negative";
+
+    //             const call_back_date = await reviewCallback(transcript);
+
+    //             const duration_in_HMS = convertMsToHourMinSec(duration_ms);
+    //             const total_duration = convertMsToHourMinSec(end_timestamp - start_timestamp) || 0;
+
+    //             statsUpdate.$inc.totalCalls = 1;
+    //             statsUpdate.$inc.totalCallDuration = duration_ms;
+    //             let callError;
+
+    //             if (is_machine) {
+    //                 statsUpdate.$inc.totalAnsweredByVm = 1;
+    //                 callStatus = callstatusenum.VOICEMAIL;
+    //             } else if (is_ivr) {
+    //                 statsUpdate.$inc.totalAnsweredByIVR = 1;
+    //                 callStatus = callstatusenum.IVR;
+    //             } else if (is_call_scheduled) {
+    //                 statsUpdate.$inc.totalAppointment = 1;
+    //                 callStatus = callstatusenum.SCHEDULED;
+    //             } else if (call_failed) {
+    //                 statsUpdate.$inc.totalFailed = 1;
+    //                 callStatus = callstatusenum.FAILED;
+    //                 callOutcome = calloutcome.FAILED;
+    //             } else if (call_transferred) {
+    //                 statsUpdate.$inc.totalTransffered = 1;
+    //                 callStatus = callstatusenum.TRANSFERRED;
+    //                 callOutcome = calloutcome.TRANSFERRED
+    //             } else if (dial_no_answer) {
+    //                 statsUpdate.$inc.totalDialNoAnswer = 1;
+    //                 callStatus = callstatusenum.NO_ANSWER;
+    //             } else if (call_inactivity) {
+    //                 statsUpdate.$inc.totalCallInactivity = 1;
+    //                 callStatus = callstatusenum.INACTIVITY;
+    //             } else if (call_hangedup) {
+    //                 statsUpdate.$inc.totalCallAnswered = 1;
+    //                 callStatus = callstatusenum.CALLED;
+    //                 callOutcome = calloutcome.SUCCESS;
+    //             } else if (call_error) {
+    //                 callError = callstatusenum.ERROR;
+    //             };
+
+    //             if (is_call_scheduled) {
+    //                 sentimentStatus = callSentimentenum.SCHEDULED;
+    //                 callOutcome = calloutcome.SCHEDULED;
+    //             } else if (is_callback) {
+    //                 sentimentStatus = callSentimentenum.CALLBACK;
+    //             } else if (is_dnc) {
+    //                 sentimentStatus = callSentimentenum.DNC;
+    //                 callOutcome = calloutcome.DNC;
+    //             } else if (is_neutral) {
+    //                 sentimentStatus = callSentimentenum.NEUTRAL;
+    //             } else if (is_positive) {
+    //                 sentimentStatus = callSentimentenum.POSITIVE;
+    //             } else if (is_negative) {
+    //                 sentimentStatus = callSentimentenum.NEGATIVE;
+    //             } else if (is_unknown) {
+    //                 sentimentStatus = callSentimentenum.UNKNOWN;
+    //             };
+
+    //             const new_transcript = await EventModel.create({
+    //                 callId: call_id,
+    //                 agentId: agent_id,
+    //                 recordingUrl: recording_url,
+    //                 callDuration: duration_in_HMS,
+    //                 disconnectionReason: disconnection_reason,
+    //                 callBackDate: call_back_date,
+    //                 retellCallStatus: call_status,
+    //                 duration: total_duration,
+    //                 timestamp: end_timestamp,
+    //                 ...(transcript && { transcript }),
+    //                 retellCallSummary: call_analysis.call_summary,
+    //                 analyzedTranscript: sentimentStatus,
+    //                 userSentiment: sentimentStatus
+    //             });
+
+    //             const callData = {
+    //                 callId: call_id,
+    //                 agentId: agent_id,
+    //                 userFirstname: retell_llm_dynamic_variables?.user_firstname || null,
+    //                 userLastname: retell_llm_dynamic_variables?.user_lastname || null,
+    //                 userEmail: retell_llm_dynamic_variables?.user_email || null,
+    //                 recordingUrl: recording_url || null,
+    //                 disconnectionReason: disconnection_reason || callError || null,
+    //                 callStatus: call_status,
+    //                 startTimestamp: start_timestamp || null,
+    //                 endTimestamp: end_timestamp || null,
+    //                 durationMs: total_duration,
+    //                 transcript: transcript || null,
+    //                 transcriptObject: transcript_object || [],
+    //                 transcriptWithToolCalls: transcript_with_tool_calls || [],
+    //                 publicLogUrl: public_log_url || null,
+    //                 callType: call_type || null,
+    //                 fromNumber: from_number || null,
+    //                 toNumber: to_number || null,
+    //                 direction: direction || null,
+    //                 date: todayString,
+    //                 address: retell_llm_dynamic_variables?.user_address || null,
+    //                 dial_status: callStatus,
+    //                 callSummary: call_analysis.call_summary || null,
+    //                 userSentiment: sentimentStatus,
+    //                 call_outcome: callOutcome || null,
+    //             };
+
+    //             await callHistoryModel.create(callData);
+
+    //             if (fetch_client.name === "New Funding Solutions") {
+    //                 if (call_transferred || is_call_scheduled) {
+    //                     await this.call_webhook(call_id);
+    //                 };
+    //             };
+
+    //             if (fetch_client.name === "Executive Strategy Group") {
+    //                 const data = {
+    //                     firstName: retell_llm_dynamic_variables.user_firstname || "",
+    //                     lastName: retell_llm_dynamic_variables.user_lastname || "",
+    //                     email: retell_llm_dynamic_variables.user_email || "",
+    //                     phone: to_number,
+    //                     transcript,
+    //                     dateCalled: todayString,
+    //                     outcome: callOutcome,
+    //                     recordingUrl: recording_url || null,
+    //                 };
+
+    //                 const { custom_analysis_data } = call_analysis;
+
+    //                 if (is_call_scheduled) {
+    //                     const data_to_send = {
+    //                         ...data,
+    //                         contact_details: custom_analysis_data?.contact_details || null,
+    //                         appointment_details: custom_analysis_data?.appointment_details || null,
+    //                         type: "appointment_booking_successful"
+    //                     };
+    //                     console.log("data: ", data_to_send);
+
+    //                     const result = await this.booking_trigger(fetch_client, data_to_send);
+
+    //                     console.log("result: ", result);
+    //                 };
+
+    //                 if (custom_analysis_data?.appointment_booking_failed) {
+    //                     const data_to_send = {
+    //                         ...data,
+    //                         contact_details: custom_analysis_data?.contact_details || null,
+    //                         failure_reason: custom_analysis_data?.failure_reason || null,
+    //                         type: "appointment_booking_failed"
+    //                     };
+    //                     console.log("data: ", data_to_send);
+
+    //                     const result = await this.booking_trigger(fetch_client, data_to_send);
+
+    //                     console.log("result: ", result);
+    //                 };
+
+    //                 if (custom_analysis_data?.appointment_booking_attempted) {
+    //                     const data_to_send = {
+    //                         ...data,
+    //                         contact_details: custom_analysis_data?.contact_details || null,
+    //                         appointment_details: custom_analysis_data?.appointment_details || null,
+    //                         type: "appointment_booking_attempted"
+    //                     };
+
+    //                     console.log("data: ", data_to_send);
+
+    //                     const result = await this.booking_trigger(fetch_client, data_to_send);
+
+    //                     console.log("result: ", result);
+    //                 };
+    //             };
+
+    //             const jobId = retell_llm_dynamic_variables.job_id ? retell_llm_dynamic_variables.job_id: null;
+
+    //             const statResults = await DailyStatsModel.findOneAndUpdate(
+    //                 { day: todayString, agentId: agent_id, jobProcessedBy: jobId },
+    //                 statsUpdate,
+    //                 { returnOriginal: false }
+    //             );
+
+    //             const timestamp = new Date();
+
+    //             await updateStatsByHour(agent_id, todayString, timestamp);
+
+    //             await contactModel.findOneAndUpdate(
+    //                 { callId: call_id, agentId: agent_id },
+    //                 {
+    //                     dial_status: callStatus,
+    //                     $push: {
+    //                         datesCalled: todaysDateForDatesCalled
+    //                     },
+    //                     referenceToCallId: new_transcript._id,
+    //                     timesCalled: time,
+    //                     $inc: {
+    //                         calledTimes: 1
+    //                     },
+    //                     linktocallLogModel: statResults?._id || null
+    //                 }
+    //             );
+
+    //             if (call_analysis.call_successful === false && analyzedTranscriptForStatus.message.content === "interested") {
+    //                 await axios.post(process.env.MAKE_URL, {
+    //                     firstname: retell_llm_dynamic_variables.user_firstname,
+    //                     lastname: retell_llm_dynamic_variables.user_lastname,
+    //                     email: retell_llm_dynamic_variables.user_email,
+    //                     phone: to_number,
+    //                     summary: call_analysis.call_summary,
+    //                     url: recording_url || null,
+    //                     transcript: transcript,
+    //                 });
+    //             };
+
+    //             console.log("call updated");
+
+    //         } else {
+    //             console.error("Event must be call analyzed: " + event);
+    //         }
+    //     } catch (e) {
+    //         console.error("Error fetching data from call analyzed: " + e);
+    //     };
+    // };
+
     async call_analyzed(payload: any, todayString: string, todaysDateForDatesCalled: any, time: any) {
         try {
             const { event, call } = payload;
@@ -409,6 +692,7 @@ class CallService extends RootService {
             let sentimentStatus;
             let callOutcome;
             let statsUpdate: any = { $inc: {} };
+            let callError;
 
             function convertMsToHourMinSec(ms: number): string {
                 const totalSeconds = Math.floor(ms / 1000);
@@ -421,6 +705,7 @@ class CallService extends RootService {
 
             if (event === "call_analyzed") {
                 console.log("inside analyzed function");
+                console.log("call's direction is: ", direction);
 
                 const call_failed = disconnection_reason === "dial_failed";
                 const call_transferred = disconnection_reason === "call_transfer";
@@ -449,56 +734,114 @@ class CallService extends RootService {
 
                 statsUpdate.$inc.totalCalls = 1;
                 statsUpdate.$inc.totalCallDuration = duration_ms;
-                let callError;
 
-                if (is_machine) {
+                const was_answered = is_call_scheduled || call_transferred || call_hangedup
+                if (was_answered) {
+                    statsUpdate.$inc.totalCallAnswered = 1;
+                };
+
+                if (is_call_scheduled) {
+                    statsUpdate.$inc.totalAppointment = 1;
+                    sentimentStatus = callSentimentenum.SCHEDULED;
+                    callOutcome = calloutcome.SCHEDULED;
+                    callStatus = callstatusenum.SCHEDULED;
+                } else if (is_machine) {
                     statsUpdate.$inc.totalAnsweredByVm = 1;
                     callStatus = callstatusenum.VOICEMAIL;
                 } else if (is_ivr) {
                     statsUpdate.$inc.totalAnsweredByIVR = 1;
                     callStatus = callstatusenum.IVR;
-                } else if (is_call_scheduled) {
-                    statsUpdate.$inc.totalAppointment = 1;
-                    callStatus = callstatusenum.SCHEDULED;
-                } else if (call_failed) {
-                    statsUpdate.$inc.totalFailed = 1;
-                    callStatus = callstatusenum.FAILED;
-                    callOutcome = calloutcome.FAILED;
-                } else if (call_transferred) {
-                    statsUpdate.$inc.totalTransffered = 1;
-                    callStatus = callstatusenum.TRANSFERRED;
-                    callOutcome = calloutcome.TRANSFERRED
-                } else if (dial_no_answer) {
-                    statsUpdate.$inc.totalDialNoAnswer = 1;
-                    callStatus = callstatusenum.NO_ANSWER;
-                } else if (call_inactivity) {
-                    statsUpdate.$inc.totalCallInactivity = 1;
-                    callStatus = callstatusenum.INACTIVITY;
-                } else if (call_hangedup) {
-                    statsUpdate.$inc.totalCallAnswered = 1;
-                    callStatus = callstatusenum.CALLED;
-                    callOutcome = calloutcome.SUCCESS;
-                } else if (call_error) {
-                    callError = callstatusenum.ERROR;
-                };
-
-                if (is_call_scheduled) {
-                    sentimentStatus = callSentimentenum.SCHEDULED;
-                    callOutcome = calloutcome.SCHEDULED;
-                } else if (is_callback) {
-                    sentimentStatus = callSentimentenum.CALLBACK;
                 } else if (is_dnc) {
                     sentimentStatus = callSentimentenum.DNC;
                     callOutcome = calloutcome.DNC;
-                } else if (is_neutral) {
-                    sentimentStatus = callSentimentenum.NEUTRAL;
-                } else if (is_positive) {
-                    sentimentStatus = callSentimentenum.POSITIVE;
-                } else if (is_negative) {
-                    sentimentStatus = callSentimentenum.NEGATIVE;
-                } else if (is_unknown) {
-                    sentimentStatus = callSentimentenum.UNKNOWN;
+                } else if (is_callback) {
+                    sentimentStatus = callSentimentenum.CALLBACK;
                 };
+
+                if (!callStatus) {
+                    if (call_failed) {
+                        statsUpdate.$inc.totalFailed = 1;
+                        callStatus = callstatusenum.FAILED;
+                        callOutcome = calloutcome.FAILED;
+                    } else if (call_transferred) {
+                        statsUpdate.$inc.totalTransffered = 1;
+                        callStatus = callstatusenum.TRANSFERRED;
+                        callOutcome = calloutcome.TRANSFERRED;
+                    } else if (dial_no_answer) {
+                        statsUpdate.$inc.totalDialNoAnswer = 1;
+                        callStatus = callstatusenum.NO_ANSWER;
+                    } else if (call_inactivity) {
+                        statsUpdate.$inc.totalCallInactivity = 1;
+                        callStatus = callstatusenum.INACTIVITY;
+                    } else if (call_hangedup) {
+                        callStatus = callstatusenum.CALLED;
+                        callOutcome = calloutcome.SUCCESS;
+                    } else if (call_error) {
+                        callError = callstatusenum.ERROR;
+                    };
+                };
+
+                if (!sentimentStatus) {
+                    if (is_neutral) {
+                        sentimentStatus = callSentimentenum.NEUTRAL;
+                    } else if (is_positive) {
+                        sentimentStatus = callSentimentenum.POSITIVE;
+                    } else if (is_negative) {
+                        sentimentStatus = callSentimentenum.NEGATIVE;
+                    } else if (is_unknown) {
+                        sentimentStatus = callSentimentenum.UNKNOWN;
+                    };
+                };
+                // let callError;
+
+                // if (is_machine) {
+                //     statsUpdate.$inc.totalAnsweredByVm = 1;
+                //     callStatus = callstatusenum.VOICEMAIL;
+                // } else if (is_ivr) {
+                //     statsUpdate.$inc.totalAnsweredByIVR = 1;
+                //     callStatus = callstatusenum.IVR;
+                // } else if (is_call_scheduled) {
+                //     statsUpdate.$inc.totalAppointment = 1;
+                //     callStatus = callstatusenum.SCHEDULED;
+                // } else if (call_failed) {
+                //     statsUpdate.$inc.totalFailed = 1;
+                //     callStatus = callstatusenum.FAILED;
+                //     callOutcome = calloutcome.FAILED;
+                // } else if (call_transferred) {
+                //     statsUpdate.$inc.totalTransffered = 1;
+                //     callStatus = callstatusenum.TRANSFERRED;
+                //     callOutcome = calloutcome.TRANSFERRED
+                // } else if (dial_no_answer) {
+                //     statsUpdate.$inc.totalDialNoAnswer = 1;
+                //     callStatus = callstatusenum.NO_ANSWER;
+                // } else if (call_inactivity) {
+                //     statsUpdate.$inc.totalCallInactivity = 1;
+                //     callStatus = callstatusenum.INACTIVITY;
+                // } else if (call_hangedup) {
+                //     statsUpdate.$inc.totalCallAnswered = 1;
+                //     callStatus = callstatusenum.CALLED;
+                //     callOutcome = calloutcome.SUCCESS;
+                // } else if (call_error) {
+                //     callError = callstatusenum.ERROR;
+                // };
+
+                // if (is_call_scheduled) {
+                //     sentimentStatus = callSentimentenum.SCHEDULED;
+                //     callOutcome = calloutcome.SCHEDULED;
+                // } else if (is_callback) {
+                //     sentimentStatus = callSentimentenum.CALLBACK;
+                // } else if (is_dnc) {
+                //     sentimentStatus = callSentimentenum.DNC;
+                //     callOutcome = calloutcome.DNC;
+                // } else if (is_neutral) {
+                //     sentimentStatus = callSentimentenum.NEUTRAL;
+                // } else if (is_positive) {
+                //     sentimentStatus = callSentimentenum.POSITIVE;
+                // } else if (is_negative) {
+                //     sentimentStatus = callSentimentenum.NEGATIVE;
+                // } else if (is_unknown) {
+                //     sentimentStatus = callSentimentenum.UNKNOWN;
+                // };
 
                 const new_transcript = await EventModel.create({
                     callId: call_id,
@@ -659,6 +1002,7 @@ class CallService extends RootService {
             console.error("Error fetching data from call analyzed: " + e);
         };
     };
+
 
     async cancel_schedule(req: AuthRequest, res: Response, next: NextFunction): Promise<Response>{
         try {
@@ -977,24 +1321,6 @@ class CallService extends RootService {
 
             const { event, call_inbound } = payload;
             console.log("payload: ", payload);
-
-            // const fetch_client = await userModel.findOne({ name });
-            // const data = {
-            //     firstName: "Atom",
-            //     lastName: "Sandler",
-            //     email: "atomsandler@outlook.com",
-            //     phone: "+12345678900",
-            //     transcript: "This is a test transcript for a failed booking attempt",
-            //     dateCalled: date,
-            //     outcome: calloutcome.SCHEDULED,
-            //     failure_reason: "invalid email",
-            //     contact_details: "lawwee@outlook.com",
-            //     type: "appointment_booking_failed",
-            //     recordingUrl: "https://example.com/recording.mp3",
-            // };
-
-            // const result = await this.booking_trigger(fetch_client, data);
-            // console.log("result: ", result);
 
             if (event === "call_inbound") {
                 console.log("inside the call_inbound event: ", call_inbound);
