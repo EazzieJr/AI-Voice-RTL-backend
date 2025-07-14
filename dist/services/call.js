@@ -1094,12 +1094,34 @@ class CallService extends _root_1.default {
         try {
             const payload = req.body;
             const { event, call_inbound } = payload;
-            console.log("payload: ", payload);
+            console.log("Inside inbound webhook data: ", event);
+            const todays = new Date();
+            todays.setHours(0, 0, 0, 0);
+            const todayString = todays.toISOString().split("T")[0];
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, "0");
+            const day = String(today.getDate()).padStart(2, "0");
+            const hours = String(today.getHours()).padStart(2, "0");
+            const minutes = String(today.getMinutes()).padStart(2, "0");
+            const todayStringWithTime = `${year}-${month}-${day}`;
+            const time = `${hours}: ${minutes}`;
             if (event === "call_inbound") {
                 console.log("inside the call_inbound event: ", call_inbound);
                 return res.status(200).json({
                     call_inbound: {}
                 });
+            }
+            else if (event === "call_started") {
+                console.log("inbound call started event: ", call_inbound);
+                await this.call_started(payload);
+            }
+            else if (event === "call_ended") {
+                console.log("inbound call ended event: ", call_inbound);
+            }
+            else if (event === "call_analyzed") {
+                console.log("inbound call analyzed event: ", call_inbound);
+                await this.call_analyzed(payload, todayString, todayStringWithTime, time);
             }
             else {
                 return res.status(500).json({
