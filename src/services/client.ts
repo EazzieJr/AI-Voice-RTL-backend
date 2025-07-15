@@ -1770,10 +1770,14 @@ class ClientService extends RootService {
     async schedule_details(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
         try {
             const clientId = req.user._id;
-            const agentId = req.query.agentId as string;
+            // const agentId = req.query.agentId as string;
 
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const agentId = check_user.agents[0].agentId;
+
+            if (!agentId) return res.status(400).json({ message: "No agentId found for client" });
 
             const recent_schedule = await jobModel
                 .findOne({ agentId })

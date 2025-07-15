@@ -1445,10 +1445,13 @@ class ClientService extends _root_1.default {
         var _a, _b, _c;
         try {
             const clientId = req.user._id;
-            const agentId = req.query.agentId;
+            // const agentId = req.query.agentId as string;
             const check_user = await userModel_1.userModel.findById(clientId);
             if (!check_user)
                 return res.status(400).json({ error: "User not found" });
+            const agentId = check_user.agents[0].agentId;
+            if (!agentId)
+                return res.status(400).json({ message: "No agentId found for client" });
             const recent_schedule = await contact_model_1.jobModel
                 .findOne({ agentId })
                 .sort({ createdAt: -1 })
