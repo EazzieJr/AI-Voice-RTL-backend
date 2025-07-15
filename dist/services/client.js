@@ -1508,6 +1508,7 @@ class ClientService extends _root_1.default {
                 scheduleProgress: Math.ceil(Number(completedPercent)),
                 contactsRemaining,
                 contactsDone: allProcessedContacts,
+                scheduledTime
             };
             return res.status(200).json(Object.assign({ success: true }, result));
         }
