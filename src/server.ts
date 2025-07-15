@@ -31,7 +31,7 @@ import axios from "axios";
 import argon2 from "argon2";
 // import { TwilioClient } from "./twilio_api";
 
-import { callSentimentenum, DateOption, Ilogs } from "./utils/types";
+import { callSentimentenum, ClientType, DateOption, Ilogs } from "./utils/types";
 import {
   IContact,
   RetellRequest,
@@ -2019,7 +2019,8 @@ export class Server {
             name: userInDb.name,
             agentIds: result,
             isUserAdmin: userInDb.isAdmin,
-            logo: userInDb.svgUrl || ""
+            logo: userInDb.svgUrl || "",
+            clientType: userInDb.clientType
           },
         });
       } catch (error) {

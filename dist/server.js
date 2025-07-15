@@ -1644,7 +1644,8 @@ class Server {
                         name: userInDb.name,
                         agentIds: result,
                         isUserAdmin: userInDb.isAdmin,
-                        logo: userInDb.svgUrl || ""
+                        logo: userInDb.svgUrl || "",
+                        clientType: userInDb.clientType
                     },
                 });
             }
