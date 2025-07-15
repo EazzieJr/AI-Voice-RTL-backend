@@ -10,7 +10,7 @@ exports.DashboardSchema = joi_1.default.object({
     dateOption: joi_1.default.string().required()
 });
 exports.CallHistorySchema = joi_1.default.object({
-    agentIds: joi_1.default.array().items(joi_1.default.string()).required(),
+    // agentIds: Joi.array().items(Joi.string()).required(),
     page: joi_1.default.number(),
     startDate: joi_1.default.date(),
     endDate: joi_1.default.date(),

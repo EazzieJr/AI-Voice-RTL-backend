@@ -282,8 +282,12 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { agentIds, startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome, direction } = body;
+            const agentIds = check_user.agents.map((agent) => agent.agentId);
+
+            const { startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome, direction } = body;
             const page = parseInt(body.page) || 1;
+
+            console.log("agentIds: ", agentIds);
 
             const pageSize = 100;
             const skip = (page - 1) * pageSize;

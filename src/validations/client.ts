@@ -7,7 +7,7 @@ export const DashboardSchema = Joi.object({
 });
 
 export const CallHistorySchema = Joi.object({
-    agentIds: Joi.array().items(Joi.string()).required(),
+    // agentIds: Joi.array().items(Joi.string()).required(),
     page: Joi.number(),
     startDate: Joi.date(),
     endDate: Joi.date(),
