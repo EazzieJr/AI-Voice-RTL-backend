@@ -37,11 +37,14 @@ class ClientService extends RootService {
             });
             if (error) return this.handle_validation_errors(error, res, next);
 
-            const dateOption = req.body.dateOption as DateOption;
-            const { agentIds } = body;
-
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
+
+            const agentIds = check_user.agents.map((agent) => agent.agentId);
+            const dateOption = req.body.dateOption as DateOption;
+            // const { agentIds } = body;
+
+            console.log("agentIds: ", agentIds);
 
             if (!Object.values(DateOption).includes(dateOption)) {
                 return res.status(400).json({ error: "Invalid date option" })

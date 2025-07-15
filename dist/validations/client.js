@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CampaignDashboardSchema = exports.FetchRepliesSchema = exports.ExportKPISchema = exports.VoiceKPISchema = exports.AddNoteSchema = exports.EditProfileSchema = exports.ContactsSchema = exports.UpdateAgentIdSchema = exports.AgentDataSchema = exports.AddWebhookSchema = exports.ReplyLeadSchema = exports.ForwardReplySchema = exports.CampaignStatisticsSchema = exports.UploadCSVSchema = exports.CallHistorySchema = exports.DashboardSchema = void 0;
 const joi_1 = __importDefault(require("joi"));
 exports.DashboardSchema = joi_1.default.object({
-    agentIds: joi_1.default.array().items(joi_1.default.string()).required(),
+    // agentIds: Joi.array().items(Joi.string()).required(),
     dateOption: joi_1.default.string().required()
 });
 exports.CallHistorySchema = joi_1.default.object({

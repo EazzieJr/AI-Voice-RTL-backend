@@ -2,7 +2,7 @@ import Joi from "joi";
 import { start } from "repl";
 
 export const DashboardSchema = Joi.object({
-    agentIds: Joi.array().items(Joi.string()).required(),
+    // agentIds: Joi.array().items(Joi.string()).required(),
     dateOption: Joi.string().required()
 });
 
