@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CampaignDashboardSchema = exports.FetchRepliesSchema = exports.ExportKPISchema = exports.VoiceKPISchema = exports.AddNoteSchema = exports.EditProfileSchema = exports.ContactsSchema = exports.UpdateAgentIdSchema = exports.AgentDataSchema = exports.AddWebhookSchema = exports.ReplyLeadSchema = exports.ForwardReplySchema = exports.CampaignStatisticsSchema = exports.UploadCSVSchema = exports.CallHistorySchema = exports.DashboardSchema = void 0;
+exports.CampaignDashboardSchema = exports.FetchRepliesSchema = exports.ExportKPISchema = exports.VoiceKPISchema = exports.AddNoteSchema = exports.ContactsSchema = exports.UpdateAgentIdSchema = exports.AgentDataSchema = exports.AddWebhookSchema = exports.ReplyLeadSchema = exports.ForwardReplySchema = exports.CampaignStatisticsSchema = exports.UploadCSVSchema = exports.CallHistorySchema = exports.DashboardSchema = void 0;
 const joi_1 = __importDefault(require("joi"));
 exports.DashboardSchema = joi_1.default.object({
     // agentIds: Joi.array().items(Joi.string()).required(),
@@ -72,15 +72,15 @@ exports.UpdateAgentIdSchema = joi_1.default.object({
 exports.ContactsSchema = joi_1.default.object({
     contacts: joi_1.default.array().items(joi_1.default.string().hex().length(24))
 });
-exports.EditProfileSchema = joi_1.default.object({
-    username: joi_1.default.string(),
-    password: joi_1.default.string(),
-    email: joi_1.default.string(),
-    group: joi_1.default.string(),
-    name: joi_1.default.string(),
-    agent: joi_1.default.string(),
-    clientType: joi_1.default.string(),
-});
+// export const EditProfileSchema = Joi.object({
+//     username: Joi.string(),
+//     password: Joi.string(),
+//     email: Joi.string(),
+//     group: Joi.string(),
+//     name: Joi.string(),
+//     agent: Joi.string(),
+//     clientType: Joi.string(),
+// });
 exports.AddNoteSchema = joi_1.default.object({
     callId: joi_1.default.string().required(),
     notes: joi_1.default.string().required(),

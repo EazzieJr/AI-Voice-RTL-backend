@@ -78,15 +78,15 @@ export const ContactsSchema = Joi.object({
     contacts: Joi.array().items(Joi.string().hex().length(24))
 });
 
-export const EditProfileSchema = Joi.object({
-    username: Joi.string(),
-    password: Joi.string(),
-    email: Joi.string(),
-    group: Joi.string(),
-    name: Joi.string(),
-    agent: Joi.string(),
-    clientType: Joi.string(),
-});
+// export const EditProfileSchema = Joi.object({
+//     username: Joi.string(),
+//     password: Joi.string(),
+//     email: Joi.string(),
+//     group: Joi.string(),
+//     name: Joi.string(),
+//     agent: Joi.string(),
+//     clientType: Joi.string(),
+// });
 
 export const AddNoteSchema = Joi.object({
     callId: Joi.string().required(),

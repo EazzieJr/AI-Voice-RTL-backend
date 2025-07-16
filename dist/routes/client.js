@@ -38,7 +38,11 @@ multerConfig_1.upload.single("csvFile"), (req, res, next) => client_1.client_ser
     .get("/minutes-used", authenticate, (req, res, next) => client_1.client_service.minutes_used(req, res, next))
     .get("/trigger-lead-calls", authenticate, (req, res, next) => client_1.client_service.trigger_lead_calls(req, res, next))
     .post("/sentiment-transcript", authenticate, (req, res, next) => client_1.client_service.sentiment_correction_script(req, res, next))
-    .put("/edit-profile", authenticate, upload_1.upload.single("svgFile"), (req, res, next) => client_1.client_service.edit_profile(req, res, next))
+    // .put(
+    //     "/edit-profile", 
+    //     authenticate,
+    //     load.single("svgFile"),
+    //     (req: AuthRequest, res: Response, next: NextFunction) => client_service.edit_profile(req, res, next))
     .put("/upload-svg", authenticate, upload_1.upload.single("svgFile"), (req, res, next) => client_1.client_service.upload_svg(req, res, next))
     .post("/add-notes", authenticate, (req, res, next) => client_1.client_service.add_notes(req, res, next))
     // .post("/voice-kpi", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.voice_kpi(req, res, next))
