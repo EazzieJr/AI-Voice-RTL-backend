@@ -241,6 +241,14 @@ class ClientService extends RootService {
                 disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] },
                 ...date_to_check
             });
+
+            const inboundCalls = await callHistoryModel.countDocuments({
+                agentId: { $in: agentIds },
+                direction: "inbound",
+                ...date_to_check
+            });
+
+            console.log("Inbound Calls: ", inboundCalls);
             console.log("automatedAnswers: ", automatedAnswers);
 
             const automatedRate = (automatedAnswers / totalCalls) * 100;
@@ -259,6 +267,7 @@ class ClientService extends RootService {
                 totalCalls,
                 ...(conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` }),
                 ...(averageCallDuration !== undefined && { averageCallDuration }),
+                inboundCalls,
                 // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
                 // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
                 // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,

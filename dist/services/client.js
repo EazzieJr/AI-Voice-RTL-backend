@@ -197,14 +197,16 @@ class ClientService extends _root_1.default {
             ;
             // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
             const automatedAnswers = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
+            const inboundCalls = await historyModel_1.default.countDocuments(Object.assign({ agentId: { $in: agentIds }, direction: "inbound" }, date_to_check));
+            console.log("Inbound Calls: ", inboundCalls);
             console.log("automatedAnswers: ", automatedAnswers);
             const automatedRate = (automatedAnswers / totalCalls) * 100;
-            return res.status(200).json(Object.assign(Object.assign({ totalContactForAgent,
+            return res.status(200).json(Object.assign(Object.assign(Object.assign({ totalContactForAgent,
                 totalAnsweredCalls, answerRate: `${answerRate.toFixed(2)}%`, 
                 // totalNotCalledForAgent,
                 callDuration: combinedCallDuration, totalAutomatedAnswers: automatedAnswers, automatedRate: `${automatedRate.toFixed(2)}%`, 
                 // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
-                totalAppointment: totalAppointments, totalCallsTransferred: ((_d = stats[0]) === null || _d === void 0 ? void 0 : _d.totalCallsTransffered) || 0, totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })));
+                totalAppointment: totalAppointments, totalCallsTransferred: ((_d = stats[0]) === null || _d === void 0 ? void 0 : _d.totalCallsTransffered) || 0, totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })), { inboundCalls }));
         }
         catch (error) {
             console.error("Error fetching dashboard stats: ", error);
