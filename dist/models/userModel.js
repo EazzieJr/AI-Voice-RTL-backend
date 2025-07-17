@@ -15,6 +15,10 @@ const agentSchema = new mongoose_1.Schema({
     tag: [String],
     alias: String,
     name: String,
+    type: {
+        type: String,
+        default: "outbound" // replace "defaultType" with your desired default value
+    }
 });
 const loginSchema = new mongoose_1.Schema({
     loginTime: {

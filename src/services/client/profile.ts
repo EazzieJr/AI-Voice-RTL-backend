@@ -21,7 +21,7 @@ class ProfileManagementService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { username, password, email, group, name, agent, clientType } = body;
+            const { username, password, email, group, name, agent, clientType, inbound } = body;
             let data_to_update = {};
 
             if (password) {

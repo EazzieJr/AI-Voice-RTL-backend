@@ -8,4 +8,5 @@ export const EditProfileSchema = Joi.object({
     name: Joi.string(),
     agent: Joi.string(),
     clientType: Joi.string(),
+    inbound: Joi.string(),
 });

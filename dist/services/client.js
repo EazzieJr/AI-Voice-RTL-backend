@@ -385,7 +385,7 @@ class ClientService extends _root_1.default {
                     const durationParts = typeof (history === null || history === void 0 ? void 0 : history.durationMs) === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
                     return `${durationParts[1]}:${durationParts[2]}`;
                 })() : "00:00";
-                const tagToDisplay = lead.tag ? lead.tag.toLowerCase() : "";
+                const tagToDisplay = ((lead === null || lead === void 0 ? void 0 : lead.tag) && typeof lead.tag === "string") ? lead.tag.toLowerCase() : "";
                 return {
                     callId: history.callId || "",
                     firstName: history.userFirstname || "",

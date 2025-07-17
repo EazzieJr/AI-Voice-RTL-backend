@@ -13,4 +13,5 @@ exports.EditProfileSchema = joi_1.default.object({
     name: joi_1.default.string(),
     agent: joi_1.default.string(),
     clientType: joi_1.default.string(),
+    inbound: joi_1.default.string(),
 });

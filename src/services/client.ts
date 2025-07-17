@@ -468,7 +468,7 @@ class ClientService extends RootService {
                     const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
                     return `${durationParts[1]}:${durationParts[2]}`;
                 })() : "00:00";
-                const tagToDisplay = lead.tag ? lead.tag.toLowerCase() : "";
+                const tagToDisplay = (lead?.tag && typeof lead.tag === "string") ? lead.tag.toLowerCase() : "";
 
                 return {
                     callId: history.callId || "",
