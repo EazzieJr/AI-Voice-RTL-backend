@@ -238,6 +238,46 @@ class VoiceDataService extends RootService {
         };
     };
 
+    async schedule_history(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found" });
+
+            const agentId = check_user.agents.find(agent => agent.type === "outbound")?.agentId;
+            if (!agentId) return res.status(400).json({ error: "No outbound agent found" });
+
+            const schedules = await jobModel.find({ agentId }).sort({ createdAt: -1 }).lean();
+
+            const result = schedules.map((schedule: any) => {
+                const jobId = schedule.jobId;
+
+                if (!jobId) return null;
+                const date = schedule.scheduledTime.split("T")[0];
+                const tag = schedule.tagProcessedFor ? schedule.tagProcessedFor.toLowerCase() : "unknown";
+
+                return {
+                    date,
+                    tag,
+                    jobId
+                }
+            });
+
+            console.log("Dates called result: ", result);
+
+            res.status(200).json({
+                success: true,
+                message: "Dates called fetched successfully",
+                dateTagArray: result.filter(item => item !== null)
+            });
+
+        } catch (e) {
+            console.error("Error fetching dates called: " + e);
+            next(e);
+        };
+    };
+
 };
 
 export const voice_data_service = new VoiceDataService();

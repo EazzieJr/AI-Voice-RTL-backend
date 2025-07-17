@@ -10,4 +10,6 @@ const router = express.Router();
 router
     .post("/voice-kpi", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => voice_data_service.voice_kpi(req, res, next))
 
+    .get("/schedule-history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => voice_data_service.schedule_history(req, res, next))
+
 export default router;

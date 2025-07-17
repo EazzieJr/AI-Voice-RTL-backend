@@ -214,6 +214,43 @@ class VoiceDataService extends _root_1.default {
         ;
     }
     ;
+    async schedule_history(req, res, next) {
+        var _a;
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const agentId = (_a = check_user.agents.find(agent => agent.type === "outbound")) === null || _a === void 0 ? void 0 : _a.agentId;
+            if (!agentId)
+                return res.status(400).json({ error: "No outbound agent found" });
+            const schedules = await contact_model_1.jobModel.find({ agentId }).sort({ createdAt: -1 }).lean();
+            const result = schedules.map((schedule) => {
+                const jobId = schedule.jobId;
+                if (!jobId)
+                    return null;
+                const date = schedule.scheduledTime.split("T")[0];
+                const tag = schedule.tagProcessedFor ? schedule.tagProcessedFor.toLowerCase() : "unknown";
+                return {
+                    date,
+                    tag,
+                    jobId
+                };
+            });
+            console.log("Dates called result: ", result);
+            res.status(200).json({
+                success: true,
+                message: "Dates called fetched successfully",
+                dateTagArray: result.filter(item => item !== null)
+            });
+        }
+        catch (e) {
+            console.error("Error fetching dates called: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
 }
 ;
 exports.voice_data_service = new VoiceDataService();
