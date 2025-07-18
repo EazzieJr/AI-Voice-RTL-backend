@@ -260,11 +260,12 @@ class VoiceDataService extends RootService {
                 return {
                     date,
                     tag,
-                    jobId
-                }
+                    jobId,
+                    totalCalls: schedule.totalContactToProcess,
+                    callsMade: schedule.processedContacts,
+                    status: schedule.callstatus
+                };
             });
-
-            console.log("Dates called result: ", result);
 
             res.status(200).json({
                 success: true,
