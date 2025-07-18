@@ -23,6 +23,7 @@ class ProfileManagementService extends RootService {
 
             const { username, password, email, group, name, agent, clientType, inbound } = body;
             let data_to_update = {};
+            let pushAgent: Boolean;
 
             if (password) {
                 const new_hash = await argon2.hash(password);
@@ -101,6 +102,27 @@ class ProfileManagementService extends RootService {
 
             };
 
+            if (inbound) {
+                const check_inbound = await userModel.findOne({ _id: clientId, agents: { $elemMatch: { type: "inbound" } } });
+                console.log("check inbound: ", check_inbound);
+                if (check_inbound) {
+                    const inboundAgent = check_user.agents.find(agent => agent.type === "inbound");
+
+                    if (inboundAgent) {
+                        console.log("Inbound agent exists");
+                        data_to_update = {
+                            ...data_to_update,
+                            "agents.$[elem].agentId": inbound
+                        }
+                    } 
+                } else {
+                    console.log("Inbound agent does not exist");
+                    pushAgent = true;
+                };
+                
+                console.log("data_to_update: ", data_to_update);
+            };
+
             const fieldsToUpdate = { username, group, name };
             for (const [key, value] of Object.entries(fieldsToUpdate)) {
                 if (value !== undefined && value !== null && value !== '') {
@@ -113,11 +135,28 @@ class ProfileManagementService extends RootService {
 
             const updatedUser = await userModel.updateOne(
                 { _id: clientId },
-                { $set: data_to_update }
+                { $set: data_to_update },
+                { arrayFilters: [{ "elem.type": "inbound" }] }
             );
 
             if (!updatedUser.acknowledged) {
                 return res.status(400).json({ message: "Unable to update profile" });
+            };
+
+            if (pushAgent) {
+                const push = await userModel.updateOne(
+                    { _id: clientId },
+                    { $push: { agents: { type: "inbound", agentId: inbound }} }
+                );
+                console.log("Push result: ", push);
+                if (!push.acknowledged) {
+                    return res.status(400).json({ message: "Unable to push inbound agent" });
+                };
+
+                data_to_update = {
+                    ...data_to_update,
+                    agents: { type: "inbound", agentId: inbound }
+                };
             };
 
             return res.status(200).json({
