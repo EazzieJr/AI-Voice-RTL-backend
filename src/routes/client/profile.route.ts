@@ -16,4 +16,7 @@ router
         load.single("svgFile"),
         (req: AuthRequest, res: Response, next: NextFunction) => profile_management_service.edit_profile(req, res, next))
 
+    .get("/details", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => profile_management_service.client_details(req, res, next))
+        
+
 export default router;

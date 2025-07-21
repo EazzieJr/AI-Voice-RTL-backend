@@ -10,5 +10,6 @@ const upload_1 = require("../../utils/upload");
 const authenticate = auth_1.default.authenticate;
 const router = express_1.default.Router();
 router
-    .put("/edit-profile", authenticate, upload_1.upload.single("svgFile"), (req, res, next) => profile_1.profile_management_service.edit_profile(req, res, next));
+    .put("/edit-profile", authenticate, upload_1.upload.single("svgFile"), (req, res, next) => profile_1.profile_management_service.edit_profile(req, res, next))
+    .get("/details", authenticate, (req, res, next) => profile_1.profile_management_service.client_details(req, res, next));
 exports.default = router;

@@ -157,6 +157,29 @@ class ProfileManagementService extends _root_1.default {
         ;
     }
     ;
+    async client_details(req, res, next) {
+        try {
+            const clientId = req.user._id;
+            const check_user = await userModel_1.userModel.findById(clientId).select("email username group name agents autoEmail svgUrl clientType").lean();
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const inbound = check_user.agents.find((agent) => agent.type === "inbound");
+            const outbound = check_user.agents.find((agent) => agent.type === "outbound");
+            const result = Object.assign(Object.assign({ name: check_user.name, email: check_user.email, username: check_user.username, group: check_user.group, 
+                // agentId: check_user?.agents[0]?.agentId || "",
+                autoEmail: check_user.autoEmail || check_user.email, logo: check_user.svgUrl || "", clientType: check_user.clientType }, (inbound && { inbound: inbound.agentId })), (outbound && { outbound: outbound.agentId }));
+            return res.status(200).json({
+                success: true,
+                result
+            });
+        }
+        catch (e) {
+            console.error("Error fetching client details: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
 }
 ;
 exports.profile_management_service = new ProfileManagementService();
