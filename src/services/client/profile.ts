@@ -7,6 +7,7 @@ import argon2 from "argon2";
 import { ClientType } from "../../utils/types";
 import { cloudinary } from "../../utils/upload";
 import streamifier from "streamifier";
+import { UpdateAgent } from "../../utils/agent";
 
 class ProfileManagementService extends RootService {
     async edit_profile(req: AuthRequest, res: Response, next: NextFunction) {
@@ -102,27 +103,6 @@ class ProfileManagementService extends RootService {
 
             };
 
-            if (inbound) {
-                const check_inbound = await userModel.findOne({ _id: clientId, agents: { $elemMatch: { type: "inbound" } } });
-                console.log("check inbound: ", check_inbound);
-                if (check_inbound) {
-                    const inboundAgent = check_user.agents.find(agent => agent.type === "inbound");
-
-                    if (inboundAgent) {
-                        console.log("Inbound agent exists");
-                        data_to_update = {
-                            ...data_to_update,
-                            "agents.$[elem].agentId": inbound
-                        }
-                    } 
-                } else {
-                    console.log("Inbound agent does not exist");
-                    pushAgent = true;
-                };
-                
-                console.log("data_to_update: ", data_to_update);
-            };
-
             const fieldsToUpdate = { username, group, name };
             for (const [key, value] of Object.entries(fieldsToUpdate)) {
                 if (value !== undefined && value !== null && value !== '') {
@@ -141,6 +121,51 @@ class ProfileManagementService extends RootService {
 
             if (!updatedUser.acknowledged) {
                 return res.status(400).json({ message: "Unable to update profile" });
+            };
+
+            if (inbound) {
+                const check_inbound = await userModel.findOne({ _id: clientId, agents: { $elemMatch: { type: "inbound" } } });
+                console.log("check inbound: ", check_inbound);
+                if (check_inbound) {
+                    const inboundAgent = check_user.agents.find(agent => agent.type === "inbound");
+
+                    if (inboundAgent) {
+                        console.log("Inbound agent exists");
+                        const inbound_agent = inboundAgent.agentId;
+                        const checkAgent = await userModel.find({ 'agents.agentId': inbound_agent });
+
+                        if (checkAgent.length > 0) {
+                            return res.status(400).json({ message: "AgentId already exists" });
+                        };
+
+                        const agentUpdate = await UpdateAgent(inbound_agent, inbound, "inbound");
+                        console.log("Agent update result: ", agentUpdate);
+                        
+                        data_to_update = {
+                            ...data_to_update,
+                            agentUpdate,
+                        };
+                    };
+                    
+                } else {
+                    console.log("Inbound agent does not exist");
+
+                    const push = await userModel.updateOne(
+                        { _id: clientId },
+                        { $push: { agents: { type: "inbound", agentId: inbound }} }
+                    );
+                    console.log("Push result: ", push);
+                    if (!push.acknowledged) {
+                        return res.status(400).json({ message: "Unable to push inbound agent" });
+                    };
+
+                    data_to_update = {
+                        ...data_to_update,
+                        newInboundAgent: { type: "inbound", agentId: inbound }
+                    };
+                };
+                
+                console.log("data_to_update: ", data_to_update);
             };
 
             if (pushAgent) {

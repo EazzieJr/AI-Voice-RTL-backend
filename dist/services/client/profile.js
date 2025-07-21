@@ -11,6 +11,7 @@ const argon2_1 = __importDefault(require("argon2"));
 const types_1 = require("../../utils/types");
 const upload_1 = require("../../utils/upload");
 const streamifier_1 = __importDefault(require("streamifier"));
+const agent_1 = require("../../utils/agent");
 class ProfileManagementService extends _root_1.default {
     async edit_profile(req, res, next) {
         try {
@@ -83,24 +84,6 @@ class ProfileManagementService extends _root_1.default {
                 data_to_update = Object.assign(Object.assign({}, data_to_update), { svgUrl });
             }
             ;
-            if (inbound) {
-                const check_inbound = await userModel_1.userModel.findOne({ _id: clientId, agents: { $elemMatch: { type: "inbound" } } });
-                console.log("check inbound: ", check_inbound);
-                if (check_inbound) {
-                    const inboundAgent = check_user.agents.find(agent => agent.type === "inbound");
-                    if (inboundAgent) {
-                        console.log("Inbound agent exists");
-                        data_to_update = Object.assign(Object.assign({}, data_to_update), { "agents.$[elem].agentId": inbound });
-                    }
-                }
-                else {
-                    console.log("Inbound agent does not exist");
-                    pushAgent = true;
-                }
-                ;
-                console.log("data_to_update: ", data_to_update);
-            }
-            ;
             const fieldsToUpdate = { username, group, name };
             for (const [key, value] of Object.entries(fieldsToUpdate)) {
                 if (value !== undefined && value !== null && value !== '') {
@@ -111,6 +94,39 @@ class ProfileManagementService extends _root_1.default {
             const updatedUser = await userModel_1.userModel.updateOne({ _id: clientId }, { $set: data_to_update }, { arrayFilters: [{ "elem.type": "inbound" }] });
             if (!updatedUser.acknowledged) {
                 return res.status(400).json({ message: "Unable to update profile" });
+            }
+            ;
+            if (inbound) {
+                const check_inbound = await userModel_1.userModel.findOne({ _id: clientId, agents: { $elemMatch: { type: "inbound" } } });
+                console.log("check inbound: ", check_inbound);
+                if (check_inbound) {
+                    const inboundAgent = check_user.agents.find(agent => agent.type === "inbound");
+                    if (inboundAgent) {
+                        console.log("Inbound agent exists");
+                        const inbound_agent = inboundAgent.agentId;
+                        const checkAgent = await userModel_1.userModel.find({ 'agents.agentId': inbound_agent });
+                        if (checkAgent.length > 0) {
+                            return res.status(400).json({ message: "AgentId already exists" });
+                        }
+                        ;
+                        const agentUpdate = await (0, agent_1.UpdateAgent)(inbound_agent, inbound, "inbound");
+                        console.log("Agent update result: ", agentUpdate);
+                        data_to_update = Object.assign(Object.assign({}, data_to_update), { agentUpdate });
+                    }
+                    ;
+                }
+                else {
+                    console.log("Inbound agent does not exist");
+                    const push = await userModel_1.userModel.updateOne({ _id: clientId }, { $push: { agents: { type: "inbound", agentId: inbound } } });
+                    console.log("Push result: ", push);
+                    if (!push.acknowledged) {
+                        return res.status(400).json({ message: "Unable to push inbound agent" });
+                    }
+                    ;
+                    data_to_update = Object.assign(Object.assign({}, data_to_update), { newInboundAgent: { type: "inbound", agentId: inbound } });
+                }
+                ;
+                console.log("data_to_update: ", data_to_update);
             }
             ;
             if (pushAgent) {
