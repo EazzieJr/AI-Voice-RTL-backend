@@ -6,7 +6,7 @@ export const EditProfileSchema = Joi.object({
     email: Joi.string(),
     group: Joi.string(),
     name: Joi.string(),
-    agent: Joi.string(),
     clientType: Joi.string(),
     inbound: Joi.string(),
+    outbound: Joi.string(),
 });

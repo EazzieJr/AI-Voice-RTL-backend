@@ -24,25 +24,14 @@ class ProfileManagementService extends _root_1.default {
             const check_user = await userModel_1.userModel.findById(clientId);
             if (!check_user)
                 return res.status(400).json({ error: "User not found" });
-            const { username, password, email, group, name, agent, clientType, inbound } = body;
+            const { username, password, email, group, name, clientType, inbound, outbound } = body;
             let data_to_update = {};
-            let pushAgent;
             if (password) {
                 const new_hash = await argon2_1.default.hash(password);
                 data_to_update = {
                     password,
                     passwordHash: new_hash
                 };
-            }
-            ;
-            if (agent) {
-                // const existingAgentIndex = check_user.agents.findIndex((a: any) => a.agentId === agent.agentId);
-                // if (existingAgentIndex !== -1) {
-                //     check_user.agents[existingAgentIndex] = agent;
-                // } else {
-                //     check_user.agents.push(agent);
-                // }
-                data_to_update = Object.assign(Object.assign({}, data_to_update), { "agents.0.agentId": agent });
             }
             ;
             if (email) {
@@ -104,14 +93,14 @@ class ProfileManagementService extends _root_1.default {
                     if (inboundAgent) {
                         console.log("Inbound agent exists");
                         const inbound_agent = inboundAgent.agentId;
-                        const checkAgent = await userModel_1.userModel.find({ 'agents.agentId': inbound_agent });
+                        const checkAgent = await userModel_1.userModel.find({ 'agents.agentId': inbound });
                         if (checkAgent.length > 0) {
-                            return res.status(400).json({ message: "AgentId already exists" });
+                            return res.status(400).json({ message: "Inbound AgentId already exists" });
                         }
                         ;
                         const agentUpdate = await (0, agent_1.UpdateAgent)(inbound_agent, inbound, "inbound");
                         console.log("Agent update result: ", agentUpdate);
-                        data_to_update = Object.assign(Object.assign({}, data_to_update), { agentUpdate });
+                        data_to_update = Object.assign(Object.assign({}, data_to_update), { inboundAgentUpdate: agentUpdate });
                     }
                     ;
                 }
@@ -129,14 +118,30 @@ class ProfileManagementService extends _root_1.default {
                 console.log("data_to_update: ", data_to_update);
             }
             ;
-            if (pushAgent) {
-                const push = await userModel_1.userModel.updateOne({ _id: clientId }, { $push: { agents: { type: "inbound", agentId: inbound } } });
-                console.log("Push result: ", push);
-                if (!push.acknowledged) {
-                    return res.status(400).json({ message: "Unable to push inbound agent" });
+            if (outbound) {
+                const check_outbound = await userModel_1.userModel.findOne({ _id: clientId, agents: { $elemMatch: { type: "outbound" } } });
+                console.log("check outbound: ", check_outbound);
+                if (check_outbound) {
+                    const outboundAgent = check_user.agents.find(agent => agent.type === "outbound");
+                    if (outboundAgent) {
+                        console.log("Outbound agent exists");
+                        const outbound_agent = outboundAgent.agentId;
+                        const checkAgent = await userModel_1.userModel.find({ 'agents.agentId': outbound });
+                        if (checkAgent.length > 0) {
+                            return res.status(400).json({ message: "Outbound AgentId already exists" });
+                        }
+                        ;
+                        const agentUpdate = await (0, agent_1.UpdateAgent)(outbound_agent, outbound, "outbound");
+                        console.log("Agent update result: ", agentUpdate);
+                        data_to_update = Object.assign(Object.assign({}, data_to_update), { outboundAgentUpdate: agentUpdate });
+                    }
+                    ;
+                }
+                else {
+                    return res.status(400).json({ message: "Outbound agent does not exist" });
                 }
                 ;
-                data_to_update = Object.assign(Object.assign({}, data_to_update), { agents: { type: "inbound", agentId: inbound } });
+                console.log("data_to_update: ", data_to_update);
             }
             ;
             return res.status(200).json({
