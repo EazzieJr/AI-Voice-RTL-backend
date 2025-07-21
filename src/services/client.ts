@@ -3028,15 +3028,20 @@ class ClientService extends RootService {
             const check_user = await userModel.findById(clientId).select("email username group name agents autoEmail svgUrl clientType").lean();
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
+            const inbound = check_user.agents.find((agent: any) => agent.type === "inbound");
+            const outbound = check_user.agents.find((agent: any) => agent.type === "outbound");
+
             const result = {
                 name: check_user.name,
                 email: check_user.email,
                 username: check_user.username,
                 group: check_user.group,
-                agentId: check_user?.agents[0]?.agentId || "",
+                // agentId: check_user?.agents[0]?.agentId || "",
                 autoEmail: check_user.autoEmail || check_user.email,
                 logo: check_user.svgUrl || "",
-                clientType: check_user.clientType
+                clientType: check_user.clientType,
+                ...(inbound && { inbound: inbound.agentId }),
+                ...(outbound && { outbound: outbound.agentId }),
             };
 
             return res.status(200).json({
