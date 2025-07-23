@@ -98,6 +98,7 @@ class EmailCampaignService extends _root_1.default {
                         clicked: response_data.click_count,
                         replied: response_data.reply_count,
                         bounced: response_data.bounce_count,
+                        positiveReplies: response_data.positive_reply_count,
                     };
                     const graph_data = {
                         x: date,
@@ -123,6 +124,7 @@ class EmailCampaignService extends _root_1.default {
                         clicked: response_data.click_count,
                         replied: response_data.reply_count,
                         bounced: response_data.bounce_count,
+                        positiveReplies: response_data.positive_reply_count,
                     };
                     const graph_data = {
                         x: `${week.monday} - ${week.sunday}`,

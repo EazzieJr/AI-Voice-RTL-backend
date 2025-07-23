@@ -125,6 +125,7 @@ class EmailCampaignService extends RootService {
                         clicked: response_data.click_count,
                         replied: response_data.reply_count,
                         bounced: response_data.bounce_count,
+                        positiveReplies: response_data.positive_reply_count,
                     };
 
                     const graph_data = {
@@ -157,6 +158,7 @@ class EmailCampaignService extends RootService {
                         clicked: response_data.click_count,
                         replied: response_data.reply_count,
                         bounced: response_data.bounce_count,
+                        positiveReplies: response_data.positive_reply_count,
                     };
 
                     const graph_data = {
