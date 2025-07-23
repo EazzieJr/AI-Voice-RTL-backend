@@ -100,11 +100,15 @@ class EmailCampaignService extends _root_1.default {
                         bounced: response_data.bounce_count,
                         positiveReplies: response_data.positive_reply_count,
                     };
+                    console.log("Data for date:", date, data);
                     const graph_data = {
                         x: date,
                         y: data,
                     };
-                    emailReachGraph.push(graph_data);
+                    if (data.sent > 0 || data.opened > 0 || data.clicked > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
+                        emailReachGraph.push(graph_data);
+                    }
+                    ;
                 }
                 ;
                 console.log("Daily data fetched successfully");
@@ -130,7 +134,9 @@ class EmailCampaignService extends _root_1.default {
                         x: `${week.monday} - ${week.sunday}`,
                         y: data,
                     };
-                    emailReachGraph.push(graph_data);
+                    if (data.sent > 0 || data.opened > 0 || data.clicked > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
+                        emailReachGraph.push(graph_data);
+                    }
                 }
                 ;
             }
