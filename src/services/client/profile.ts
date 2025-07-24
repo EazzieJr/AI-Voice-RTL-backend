@@ -8,6 +8,7 @@ import { ClientType } from "../../utils/types";
 import { cloudinary } from "../../utils/upload";
 import streamifier from "streamifier";
 import { UpdateAgent } from "../../utils/agent";
+import { performServerHandshake } from "http2";
 
 class ProfileManagementService extends RootService {
     async edit_profile(req: AuthRequest, res: Response, next: NextFunction) {
@@ -22,7 +23,7 @@ class ProfileManagementService extends RootService {
             const check_user = await userModel.findById(clientId);
             if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const { username, password, email, group, name, clientType, inbound, outbound } = body;
+            const { username, password, email, group, name, clientType, inbound, outbound, phone } = body;
             let data_to_update = {};
 
             if (password) {
@@ -87,7 +88,7 @@ class ProfileManagementService extends RootService {
 
             };
 
-            const fieldsToUpdate = { username, group, name };
+            const fieldsToUpdate = { username, group, name, phone };
             for (const [key, value] of Object.entries(fieldsToUpdate)) {
                 if (value !== undefined && value !== null && value !== '') {
                     data_to_update = {

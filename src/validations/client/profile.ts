@@ -9,4 +9,5 @@ export const EditProfileSchema = Joi.object({
     clientType: Joi.string(),
     inbound: Joi.string(),
     outbound: Joi.string(),
+    phone: Joi.string(),
 });

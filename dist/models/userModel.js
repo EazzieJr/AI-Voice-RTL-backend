@@ -72,6 +72,9 @@ const userSchema = new mongoose_1.Schema({
         type: String,
         enum: Object.values(types_1.ClientType),
         default: types_1.ClientType.MIXED,
+    },
+    phone: {
+        type: String
     }
 }, {
     timestamps: true,
