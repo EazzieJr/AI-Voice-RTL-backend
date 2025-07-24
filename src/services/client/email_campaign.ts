@@ -121,8 +121,8 @@ class EmailCampaignService extends RootService {
 
                     const data = {
                         sent: response_data.sent_count,
-                        opened: response_data.open_count,
-                        clicked: response_data.click_count,
+                        // opened: response_data.open_count,
+                        // clicked: response_data.click_count,
                         replied: response_data.reply_count,
                         bounced: response_data.bounce_count,
                         positiveReplies: response_data.positive_reply_count,
@@ -135,7 +135,11 @@ class EmailCampaignService extends RootService {
                         y: data,
                     };
 
-                    if (data.sent > 0 || data.opened > 0 || data.clicked > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
+                    // if (data.sent > 0 || data.opened > 0 || data.clicked > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
+                    //     emailReachGraph.push(graph_data);
+                    // };
+
+                    if (data.sent > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
                         emailReachGraph.push(graph_data);
                     };
 
@@ -159,8 +163,8 @@ class EmailCampaignService extends RootService {
 
                     const data = {
                         sent: response_data.sent_count,
-                        opened: response_data.open_count,
-                        clicked: response_data.click_count,
+                        // opened: response_data.open_count,
+                        // clicked: response_data.click_count,
                         replied: response_data.reply_count,
                         bounced: response_data.bounce_count,
                         positiveReplies: response_data.positive_reply_count,
@@ -171,7 +175,11 @@ class EmailCampaignService extends RootService {
                         y: data,
                     };
 
-                    if (data.sent > 0 || data.opened > 0 || data.clicked > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
+                    // if (data.sent > 0 || data.opened > 0 || data.clicked > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
+                    //     emailReachGraph.push(graph_data);
+                    // }
+
+                    if (data.sent > 0 || data.replied > 0 || data.bounced > 0 || data.positiveReplies > 0) {
                         emailReachGraph.push(graph_data);
                     }
                 };
