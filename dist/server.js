@@ -1711,12 +1711,12 @@ class Server {
                     },
                 });
                 const token = jsonwebtoken_1.default.sign({ userId: userInDb._id, isAdmin: userInDb.isAdmin }, process.env.JWT_SECRET, { expiresIn: "1d" });
-                const result = await userModel_1.userModel.aggregate([
-                    { $project: { agents: 1 } },
-                    { $unwind: "$agents" },
-                    { $group: { _id: null, allAgentIds: { $push: "$agents.agentId" } } },
-                    { $project: { _id: 0, allAgentIds: 1 } },
-                ]);
+                // const result = await userModel.aggregate([
+                //   { $project: { agents: 1 } },
+                //   { $unwind: "$agents" },
+                //   { $group: { _id: null, allAgentIds: { $push: "$agents.agentId" } } },
+                //   { $project: { _id: 0, allAgentIds: 1 } },
+                // ]);
                 const clientsToReturn = ["TVAG", "ARS", "LQR", "RTLY", "GLDB"];
                 const clients = await userModel_1.userModel.aggregate([
                     {
@@ -1755,7 +1755,7 @@ class Server {
                         username: userInDb.username,
                         userId: userInDb._id,
                         group: userInDb.group,
-                        agentIds: result,
+                        // agentIds: result,
                         isUserAdmin: userInDb.isAdmin,
                         clients
                     },
