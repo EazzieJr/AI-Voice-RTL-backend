@@ -1717,6 +1717,37 @@ class Server {
                     { $group: { _id: null, allAgentIds: { $push: "$agents.agentId" } } },
                     { $project: { _id: 0, allAgentIds: 1 } },
                 ]);
+                const clientsToReturn = ["TVAG", "ARS", "LQR", "RTLY", "GLDB"];
+                const clients = await userModel_1.userModel.aggregate([
+                    {
+                        $match: {
+                            group: { $in: clientsToReturn },
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            name: "$group",
+                            alias: "$name",
+                            id: {
+                                $first: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: "$agents",
+                                                as: "agent",
+                                                cond: { $eq: ["$$agent.type", "outbound"] }
+                                            }
+                                        },
+                                        as: "filteredAgent",
+                                        in: "$$filteredAgent.agentId"
+                                    }
+                                }
+                            },
+                            number: 1
+                        }
+                    }
+                ]);
                 return res.status(200).json({
                     payload: {
                         message: "Logged in successfully",
@@ -1726,6 +1757,7 @@ class Server {
                         group: userInDb.group,
                         agentIds: result,
                         isUserAdmin: userInDb.isAdmin,
+                        clients
                     },
                 });
             }
