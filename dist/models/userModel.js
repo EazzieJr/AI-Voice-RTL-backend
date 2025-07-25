@@ -73,7 +73,7 @@ const userSchema = new mongoose_1.Schema({
         enum: Object.values(types_1.ClientType),
         default: types_1.ClientType.MIXED,
     },
-    phone: {
+    number: {
         type: String
     }
 }, {

@@ -31,7 +31,7 @@ export interface IUser extends Document {
   autoEmail?: string;
   createdAt?: Date;
   updatedAt?: Date;
-  phone?: string;
+  number?: string;
   clientType?: ClientType;
 };
 
@@ -101,7 +101,7 @@ const userSchema = new Schema(
       enum: Object.values(ClientType),
       default: ClientType.MIXED,
     },
-    phone: {
+    number: {
       type: String
     }
   },

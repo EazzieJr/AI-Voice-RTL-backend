@@ -24,7 +24,7 @@ class ProfileManagementService extends _root_1.default {
             const check_user = await userModel_1.userModel.findById(clientId);
             if (!check_user)
                 return res.status(400).json({ error: "User not found" });
-            const { username, password, email, group, name, clientType, inbound, outbound, phone } = body;
+            const { username, password, email, group, name, clientType, inbound, outbound, number } = body;
             let data_to_update = {};
             if (password) {
                 const new_hash = await argon2_1.default.hash(password);
@@ -73,7 +73,7 @@ class ProfileManagementService extends _root_1.default {
                 data_to_update = Object.assign(Object.assign({}, data_to_update), { svgUrl });
             }
             ;
-            const fieldsToUpdate = { username, group, name, phone };
+            const fieldsToUpdate = { username, group, name, number };
             for (const [key, value] of Object.entries(fieldsToUpdate)) {
                 if (value !== undefined && value !== null && value !== '') {
                     data_to_update = Object.assign(Object.assign({}, data_to_update), { [key]: value });

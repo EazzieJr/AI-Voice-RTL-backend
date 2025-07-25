@@ -14,5 +14,5 @@ exports.EditProfileSchema = joi_1.default.object({
     clientType: joi_1.default.string(),
     inbound: joi_1.default.string(),
     outbound: joi_1.default.string(),
-    phone: joi_1.default.string(),
+    number: joi_1.default.string(),
 });
