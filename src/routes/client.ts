@@ -9,7 +9,7 @@ import { upload as load } from "../utils/upload";
 const authenticate = AuthMiddleware.authenticate;
 
 router
-    .post("/dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.dashboard_stats(req, res, next))
+    // .post("/dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.dashboard_stats(req, res, next))
 
     .post("/history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.call_history(req, res, next))
 

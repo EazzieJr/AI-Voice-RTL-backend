@@ -13,6 +13,8 @@ const date_fns_tz_1 = require("date-fns-tz");
 const date_fns_1 = require("date-fns");
 const contact_model_1 = require("../../models/contact_model");
 const luxon_1 = require("luxon");
+const logModel_1 = require("../../models/logModel");
+const client_1 = require("../../utils/client");
 class VoiceDataService extends _root_1.default {
     async voice_kpi(req, res, next) {
         try {
@@ -248,6 +250,85 @@ class VoiceDataService extends _root_1.default {
         }
         catch (e) {
             console.error("Error fetching dates called: " + e);
+            next(e);
+        }
+        ;
+    }
+    ;
+    async dashboard_stats(req, res, next) {
+        var _a, _b, _c, _d, _e, _f;
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+            const check_user = await userModel_1.userModel.findById(clientId);
+            if (!check_user)
+                return res.status(400).json({ error: "User not found" });
+            const { error } = voice_data_1.DashboardSchema.validate(body, {
+                abortEarly: false
+            });
+            if (error)
+                return this.handle_validation_errors(error, res, next);
+            const dateOption = body.dateOption;
+            const jobId = body.jobId;
+            if (!dateOption && !jobId) {
+                return res.status(400).json({ error: "Either dateOption or jobId must be provided" });
+            }
+            ;
+            if (dateOption && jobId) {
+                return res.status(400).json({ error: "Only one of dateOption or jobId should be provided" });
+            }
+            ;
+            const agentId = (_a = check_user.agents.find(agent => agent.type === "outbound")) === null || _a === void 0 ? void 0 : _a.agentId;
+            if (!agentId)
+                return res.status(400).json({ error: "No outbound agent found" });
+            console.log("agentId: ", agentId);
+            const totalContactForAgent = await contact_model_1.contactModel.countDocuments({
+                agentId,
+                isDeleted: false,
+            });
+            let voiceData;
+            if (jobId) {
+                const job = await contact_model_1.jobModel.findOne({ jobId }).lean();
+                if (!job) {
+                    return res.status(404).json({ error: "JobId not found" });
+                }
+                ;
+                console.log("Job found: ", job);
+                const stats = await logModel_1.DailyStatsModel.find({
+                    jobProcessedBy: jobId
+                }).lean();
+                console.log("Stats: ", stats);
+                if (stats.length === 0) {
+                    return res.status(404).json({ error: "No stats found for the provided jobId" });
+                }
+                ;
+                const automatedResponse = await (0, client_1.AutomatedResponses)(jobId);
+                voiceData = {
+                    answeredCalls: ((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCallAnswered) || 0,
+                    callDurationInMs: ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCallDuration) || 0,
+                    automatedResponse,
+                    totalAppointments: ((_d = stats[0]) === null || _d === void 0 ? void 0 : _d.totalAppointment) || 0,
+                    totalCalls: ((_e = stats[0]) === null || _e === void 0 ? void 0 : _e.totalCalls) || 0,
+                    totalCallsTransferred: ((_f = stats[0]) === null || _f === void 0 ? void 0 : _f.totalTransffered) || 0,
+                };
+                // const answeredCalls = stats[0].totalCallAnswered || 0;
+                // const totalCalls = stats[0].totalCalls || 0;
+                // const callDuration = stats[0].totalCallDuration || 0;
+                // const date = job.scheduledTime.split("T")[0];
+                // console.log("date: ", date);
+                // const convertedCallDuration = convertMsToMinSec(callDuration);
+                // const answerRate = (answeredCalls / totalCalls) * 100;
+                // const automatedRate = (automatedResponse / totalCalls) * 100;
+                // const totalContactForAgent =
+            }
+            else if (dateOption) {
+            }
+            ;
+            console.log("voice data: ", voiceData);
+            // Fetch dashboard stats logic here
+        }
+        catch (e) {
+            console.error("Error fetching dashboard stats: " + e);
             next(e);
         }
         ;

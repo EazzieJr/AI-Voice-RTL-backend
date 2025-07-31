@@ -6,3 +6,8 @@ export const VoiceKPISchema = Joi.object({
     data: Joi.string().required(),
     page: Joi.number()
 });
+
+export const DashboardSchema = Joi.object({
+    dateOption: Joi.string(),
+    jobId: Joi.string(),
+});

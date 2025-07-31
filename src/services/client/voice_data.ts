@@ -2,13 +2,16 @@ import RootService from "../_root";
 import { Response, NextFunction } from "express";
 import { AuthRequest } from "../../middleware/authRequest";
 import callHistoryModel from "../../models/historyModel";
-import { VoiceKPISchema } from "../../validations/client/voice_data";
+import { VoiceKPISchema, DashboardSchema } from "../../validations/client/voice_data";
 import { DateOption } from "../../utils/types";
 import { userModel } from "../../models/userModel";
 import { format, toZonedTime } from "date-fns-tz";
 import { subDays } from "date-fns";
 import { jobModel, contactModel } from "../../models/contact_model";
 import { DateTime } from "luxon";
+import { date } from "joi";
+import { DailyStatsModel } from "../../models/logModel";
+import { AutomatedResponses, convertMsToMinSec } from "../../utils/client";
 
 
 class VoiceDataService extends RootService {
@@ -279,6 +282,86 @@ class VoiceDataService extends RootService {
         };
     };
 
+    async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found" });
+
+            const { error } = DashboardSchema.validate(body, {
+                abortEarly: false
+            });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const dateOption = body.dateOption as DateOption;
+            const jobId = body.jobId;
+
+            if (!dateOption && !jobId) {
+                return res.status(400).json({ error: "Either dateOption or jobId must be provided" });
+            };
+
+            if (dateOption && jobId) {
+                return res.status(400).json({ error: "Only one of dateOption or jobId should be provided" });
+            };  
+
+            const agentId = check_user.agents.find(agent => agent.type === "outbound")?.agentId;
+            if (!agentId) return res.status(400).json({ error: "No outbound agent found" });
+
+            console.log("agentId: ", agentId);
+
+            const totalContactForAgent = await contactModel.countDocuments({
+                agentId,
+                isDeleted: false,
+            });
+
+            let voiceData: any;
+
+            if (jobId) {
+                const job = await jobModel.findOne({ jobId }).lean();
+                if (!job) {
+                    return res.status(404).json({ error: "JobId not found" });
+                };
+
+                console.log("Job found: ", job);
+
+                const stats = await DailyStatsModel.find({
+                    jobProcessedBy: jobId
+                }).lean();
+
+                console.log("Stats: ", stats);
+
+                if (stats.length === 0) {
+                    return res.status(404).json({ error: "No stats found for the provided jobId" });
+                };
+
+                const automatedResponse = await AutomatedResponses(jobId);
+
+                voiceData = {
+                    answeredCalls: stats[0]?.totalCallAnswered || 0,
+                    callDurationInMs: stats[0]?.totalCallDuration || 0,
+                    automatedResponse,
+                    totalAppointments: stats[0]?.totalAppointment || 0,
+                    totalCalls: stats[0]?.totalCalls || 0,
+                    totalCallsTransferred: stats[0]?.totalTransffered || 0,
+                };
+                
+            } else if (dateOption) {
+                if (!Object.values(DateOption).includes(dateOption)) {
+                    return res.status(400).json({ error: "Invalid date option" });
+                };
+                
+            };
+
+            console.log("voice data: ", voiceData);
+            // Fetch dashboard stats logic here
+
+        } catch (e) {
+            console.error("Error fetching dashboard stats: " + e);
+            next(e);
+        };
+    };
 };
 
 export const voice_data_service = new VoiceDataService();

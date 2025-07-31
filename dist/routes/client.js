@@ -11,7 +11,7 @@ const multerConfig_1 = require("../middleware/multerConfig");
 const upload_1 = require("../utils/upload");
 const authenticate = auth_1.default.authenticate;
 router
-    .post("/dashboard", authenticate, (req, res, next) => client_1.client_service.dashboard_stats(req, res, next))
+    // .post("/dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => client_service.dashboard_stats(req, res, next))
     .post("/history", authenticate, (req, res, next) => client_1.client_service.call_history(req, res, next))
     .post("/upload-csv", 
 // authenticate,

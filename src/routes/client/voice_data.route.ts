@@ -12,4 +12,7 @@ router
 
     .get("/schedule-history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => voice_data_service.schedule_history(req, res, next))
 
+    .post("/dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => voice_data_service.dashboard_stats(req, res, next))
+
+
 export default router;

@@ -203,6 +203,8 @@ class ClientService extends RootService {
                 }
             ]);
 
+            console.log("total answered calls: ", stats[0]?.totalAnsweredCalls);
+
             function convertMsToMinSec(ms: number): string {
                 const totalSeconds = Math.floor(ms / 1000);
                 const minutes = Math.floor(totalSeconds / 60);

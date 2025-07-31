@@ -28,7 +28,7 @@ const csv_writer_1 = require("csv-writer");
 const path_1 = __importDefault(require("path"));
 class ClientService extends _root_1.default {
     async dashboard_stats(req, res, next) {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e;
         try {
             const clientId = req.user._id;
             const body = req.body;
@@ -168,6 +168,7 @@ class ClientService extends _root_1.default {
                     }
                 }
             ]);
+            console.log("total answered calls: ", (_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalAnsweredCalls);
             function convertMsToMinSec(ms) {
                 const totalSeconds = Math.floor(ms / 1000);
                 const minutes = Math.floor(totalSeconds / 60);
@@ -175,14 +176,14 @@ class ClientService extends _root_1.default {
                 return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
             }
             ;
-            const combinedCallDuration = convertMsToMinSec(((_a = stats[0]) === null || _a === void 0 ? void 0 : _a.totalCallDuration) || 0);
-            const totalCalls = ((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCalls) || 0;
+            const combinedCallDuration = convertMsToMinSec(((_b = stats[0]) === null || _b === void 0 ? void 0 : _b.totalCallDuration) || 0);
+            const totalCalls = ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCalls) || 0;
             const answerRate = (totalAnsweredCalls / totalCalls) * 100;
             if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
                 conversionRate = (totalAppointments / totalAnsweredCalls) * 100 || 0;
                 console.log("Conversion Rate: ", conversionRate);
                 if (totalAnsweredCalls > 0) {
-                    const totalDuration = ((_c = stats[0]) === null || _c === void 0 ? void 0 : _c.totalCallDuration) || 0;
+                    const totalDuration = ((_d = stats[0]) === null || _d === void 0 ? void 0 : _d.totalCallDuration) || 0;
                     const averageDuration = totalDuration / totalAnsweredCalls;
                     averageCallDuration = convertMsToMinSec(averageDuration);
                     console.log("Average Call Duration: ", averageCallDuration);
@@ -204,7 +205,7 @@ class ClientService extends _root_1.default {
                 // totalNotCalledForAgent,
                 callDuration: combinedCallDuration, totalAutomatedAnswers: automatedAnswers, automatedRate: `${automatedRate.toFixed(2)}%`, 
                 // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
-                totalAppointment: totalAppointments, totalCallsTransferred: ((_d = stats[0]) === null || _d === void 0 ? void 0 : _d.totalCallsTransffered) || 0, totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })), { inboundCalls }));
+                totalAppointment: totalAppointments, totalCallsTransferred: ((_e = stats[0]) === null || _e === void 0 ? void 0 : _e.totalCallsTransffered) || 0, totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })), { inboundCalls }));
         }
         catch (error) {
             console.error("Error fetching dashboard stats: ", error);
