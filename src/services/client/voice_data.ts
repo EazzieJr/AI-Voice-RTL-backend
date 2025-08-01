@@ -317,6 +317,8 @@ class VoiceDataService extends RootService {
             });
 
             let voiceData: any;
+            let conversionRate;
+            let averageCallDuration;
 
             if (jobId) {
                 const job = await jobModel.findOne({ jobId }).lean();
@@ -353,7 +355,6 @@ class VoiceDataService extends RootService {
                 };
 
                 const dateFilters = await DateFilterObjects(dateOption, agentId);
-                console.log("Date Filters: ", dateFilters);
 
                 const { dateFilter, dateFilter2, date_to_check } = dateFilters;
 
@@ -380,7 +381,7 @@ class VoiceDataService extends RootService {
                         }
                     }
                 ]);
-                console.log("Stats: ", stats);
+                console.log("Stats for dateOption: ", stats);
 
                 const automatedResponse = await callHistoryModel.countDocuments({
                     agentId,
@@ -388,11 +389,14 @@ class VoiceDataService extends RootService {
                     ...date_to_check
                 });
 
+                const totalAppointments = stats[0]?.totalAppointment || 0;
+                const answeredCalls = stats[0]?.totalAnsweredCalls || 0;
+
                 voiceData = {
-                    answeredCalls: stats[0]?.totalAnsweredCalls || 0,
+                    answeredCalls,
                     callDurationInMs: stats[0]?.totalCallDuration || 0,
                     automatedResponse,
-                    totalAppointments: stats[0]?.totalAppointment || 0,
+                    totalAppointments,
                     totalCalls: stats[0]?.totalCalls || 0,
                     totalCallsTransferred: stats[0]?.totalCallsTransferred || 0,
                 };
@@ -401,22 +405,38 @@ class VoiceDataService extends RootService {
 
             console.log("voice data: ", voiceData);
 
-            const answerRate = (voiceData.answeredCalls / voiceData.totalCalls) * 100;
-            const automatedRate = (voiceData.automatedResponse / voiceData.totalCalls) * 100;
-            const callDurationInMinutes = convertMsToMinSec(voiceData.callDurationInMs);
+            const totalAppointments = voiceData.totalAppointments;
+            const totalAnsweredCalls = voiceData.answeredCalls;
+            const totalCallDuration = voiceData.callDurationInMs;
 
-            console.log("Call Duration (Minutes): ", callDurationInMinutes);
+            if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
+                conversionRate = (totalAppointments / totalAnsweredCalls) * 100;
+
+                if (totalAnsweredCalls > 0) {
+                    const averageDuration = totalCallDuration / totalAnsweredCalls;
+
+                    averageCallDuration = convertMsToMinSec(averageDuration);
+                } else {
+                    averageCallDuration = "00:00";
+                };
+            };
+
+            const answerRate = (totalAnsweredCalls / voiceData.totalCalls) * 100 || 0;
+            const automatedRate = (voiceData.automatedResponse / voiceData.totalCalls) * 100 || 0;
+            const callDurationInMinutes = convertMsToMinSec(totalCallDuration);
 
             return res.status(200).json({
                 totalContactForAgent,
-                totalAnsweredCalls: voiceData.answeredCalls,
+                totalAnsweredCalls,
                 answerRate: `${answerRate.toFixed(2)}%`,
                 callDuration: callDurationInMinutes,
                 totalAutomatedResponses: voiceData.automatedResponse,
                 automatedRate: `${automatedRate.toFixed(2)}%`,
-                totalAppointment: voiceData.totalAppointments,
+                totalAppointment: totalAppointments,
                 totalCallsTransferred: voiceData.totalCallsTransferred,
                 totalCalls: voiceData.totalCalls,
+                ...(conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` }),
+                ...(averageCallDuration !== undefined && { averageCallDuration }),
             });
 
         } catch (e) {

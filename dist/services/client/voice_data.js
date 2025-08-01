@@ -287,6 +287,8 @@ class VoiceDataService extends _root_1.default {
                 isDeleted: false,
             });
             let voiceData;
+            let conversionRate;
+            let averageCallDuration;
             if (jobId) {
                 const job = await contact_model_1.jobModel.findOne({ jobId }).lean();
                 if (!job) {
@@ -318,7 +320,6 @@ class VoiceDataService extends _root_1.default {
                 }
                 ;
                 const dateFilters = await (0, client_1.DateFilterObjects)(dateOption, agentId);
-                console.log("Date Filters: ", dateFilters);
                 const { dateFilter, dateFilter2, date_to_check } = dateFilters;
                 const stats = await logModel_1.DailyStatsModel.aggregate([
                     {
@@ -340,34 +341,41 @@ class VoiceDataService extends _root_1.default {
                         }
                     }
                 ]);
-                console.log("Stats: ", stats);
+                console.log("Stats for dateOption: ", stats);
                 const automatedResponse = await historyModel_1.default.countDocuments(Object.assign({ agentId, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
+                const totalAppointments = ((_g = stats[0]) === null || _g === void 0 ? void 0 : _g.totalAppointment) || 0;
+                const answeredCalls = ((_h = stats[0]) === null || _h === void 0 ? void 0 : _h.totalAnsweredCalls) || 0;
                 voiceData = {
-                    answeredCalls: ((_g = stats[0]) === null || _g === void 0 ? void 0 : _g.totalAnsweredCalls) || 0,
-                    callDurationInMs: ((_h = stats[0]) === null || _h === void 0 ? void 0 : _h.totalCallDuration) || 0,
+                    answeredCalls,
+                    callDurationInMs: ((_j = stats[0]) === null || _j === void 0 ? void 0 : _j.totalCallDuration) || 0,
                     automatedResponse,
-                    totalAppointments: ((_j = stats[0]) === null || _j === void 0 ? void 0 : _j.totalAppointment) || 0,
+                    totalAppointments,
                     totalCalls: ((_k = stats[0]) === null || _k === void 0 ? void 0 : _k.totalCalls) || 0,
                     totalCallsTransferred: ((_l = stats[0]) === null || _l === void 0 ? void 0 : _l.totalCallsTransferred) || 0,
                 };
             }
             ;
             console.log("voice data: ", voiceData);
-            const answerRate = (voiceData.answeredCalls / voiceData.totalCalls) * 100;
-            const automatedRate = (voiceData.automatedResponse / voiceData.totalCalls) * 100;
-            const callDurationInMinutes = (0, client_1.convertMsToMinSec)(voiceData.callDurationInMs);
-            console.log("Call Duration (Minutes): ", callDurationInMinutes);
-            return res.status(200).json({
-                totalContactForAgent,
-                totalAnsweredCalls: voiceData.answeredCalls,
-                answerRate: `${answerRate.toFixed(2)}%`,
-                callDuration: callDurationInMinutes,
-                totalAutomatedResponses: voiceData.automatedResponse,
-                automatedRate: `${automatedRate.toFixed(2)}%`,
-                totalAppointment: voiceData.totalAppointments,
-                totalCallsTransferred: voiceData.totalCallsTransferred,
-                totalCalls: voiceData.totalCalls,
-            });
+            const totalAppointments = voiceData.totalAppointments;
+            const totalAnsweredCalls = voiceData.answeredCalls;
+            const totalCallDuration = voiceData.callDurationInMs;
+            if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
+                conversionRate = (totalAppointments / totalAnsweredCalls) * 100;
+                if (totalAnsweredCalls > 0) {
+                    const averageDuration = totalCallDuration / totalAnsweredCalls;
+                    averageCallDuration = (0, client_1.convertMsToMinSec)(averageDuration);
+                }
+                else {
+                    averageCallDuration = "00:00";
+                }
+                ;
+            }
+            ;
+            const answerRate = (totalAnsweredCalls / voiceData.totalCalls) * 100 || 0;
+            const automatedRate = (voiceData.automatedResponse / voiceData.totalCalls) * 100 || 0;
+            const callDurationInMinutes = (0, client_1.convertMsToMinSec)(totalCallDuration);
+            return res.status(200).json(Object.assign(Object.assign({ totalContactForAgent,
+                totalAnsweredCalls, answerRate: `${answerRate.toFixed(2)}%`, callDuration: callDurationInMinutes, totalAutomatedResponses: voiceData.automatedResponse, automatedRate: `${automatedRate.toFixed(2)}%`, totalAppointment: totalAppointments, totalCallsTransferred: voiceData.totalCallsTransferred, totalCalls: voiceData.totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })));
         }
         catch (e) {
             console.error("Error fetching dashboard stats: " + e);

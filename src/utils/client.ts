@@ -146,5 +146,9 @@ export const DateFilterObjects = async (dateOption: DateOption, agentId: string)
             break;
     };
 
+    console.log("dateFilter: ", dateFilter);
+    console.log("dateFilter2: ", dateFilter2);
+    console.log("date_to_check: ", date_to_check);
+
     return { dateFilter, dateFilter2, date_to_check };
 };
