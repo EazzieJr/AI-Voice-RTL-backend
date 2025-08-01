@@ -392,6 +392,12 @@ class VoiceDataService extends RootService {
                 const totalAppointments = stats[0]?.totalAppointment || 0;
                 const answeredCalls = stats[0]?.totalAnsweredCalls || 0;
 
+                const inboundCalls = await callHistoryModel.countDocuments({
+                    agentId,
+                    direction: "inbound",
+                    ...date_to_check
+                });
+
                 voiceData = {
                     answeredCalls,
                     callDurationInMs: stats[0]?.totalCallDuration || 0,
@@ -399,6 +405,7 @@ class VoiceDataService extends RootService {
                     totalAppointments,
                     totalCalls: stats[0]?.totalCalls || 0,
                     totalCallsTransferred: stats[0]?.totalCallsTransferred || 0,
+                    inboundCalls
                 };
 
             };
@@ -437,6 +444,7 @@ class VoiceDataService extends RootService {
                 totalCalls: voiceData.totalCalls,
                 ...(conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` }),
                 ...(averageCallDuration !== undefined && { averageCallDuration }),
+                ...(voiceData.inboundCalls !== undefined && { inboundCalls: voiceData.inboundCalls }),
             });
 
         } catch (e) {

@@ -345,6 +345,7 @@ class VoiceDataService extends _root_1.default {
                 const automatedResponse = await historyModel_1.default.countDocuments(Object.assign({ agentId, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
                 const totalAppointments = ((_g = stats[0]) === null || _g === void 0 ? void 0 : _g.totalAppointment) || 0;
                 const answeredCalls = ((_h = stats[0]) === null || _h === void 0 ? void 0 : _h.totalAnsweredCalls) || 0;
+                const inboundCalls = await historyModel_1.default.countDocuments(Object.assign({ agentId, direction: "inbound" }, date_to_check));
                 voiceData = {
                     answeredCalls,
                     callDurationInMs: ((_j = stats[0]) === null || _j === void 0 ? void 0 : _j.totalCallDuration) || 0,
@@ -352,6 +353,7 @@ class VoiceDataService extends _root_1.default {
                     totalAppointments,
                     totalCalls: ((_k = stats[0]) === null || _k === void 0 ? void 0 : _k.totalCalls) || 0,
                     totalCallsTransferred: ((_l = stats[0]) === null || _l === void 0 ? void 0 : _l.totalCallsTransferred) || 0,
+                    inboundCalls
                 };
             }
             ;
@@ -374,8 +376,8 @@ class VoiceDataService extends _root_1.default {
             const answerRate = (totalAnsweredCalls / voiceData.totalCalls) * 100 || 0;
             const automatedRate = (voiceData.automatedResponse / voiceData.totalCalls) * 100 || 0;
             const callDurationInMinutes = (0, client_1.convertMsToMinSec)(totalCallDuration);
-            return res.status(200).json(Object.assign(Object.assign({ totalContactForAgent,
-                totalAnsweredCalls, answerRate: `${answerRate.toFixed(2)}%`, callDuration: callDurationInMinutes, totalAutomatedResponses: voiceData.automatedResponse, automatedRate: `${automatedRate.toFixed(2)}%`, totalAppointment: totalAppointments, totalCallsTransferred: voiceData.totalCallsTransferred, totalCalls: voiceData.totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })));
+            return res.status(200).json(Object.assign(Object.assign(Object.assign({ totalContactForAgent,
+                totalAnsweredCalls, answerRate: `${answerRate.toFixed(2)}%`, callDuration: callDurationInMinutes, totalAutomatedResponses: voiceData.automatedResponse, automatedRate: `${automatedRate.toFixed(2)}%`, totalAppointment: totalAppointments, totalCallsTransferred: voiceData.totalCallsTransferred, totalCalls: voiceData.totalCalls }, (conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` })), (averageCallDuration !== undefined && { averageCallDuration })), (voiceData.inboundCalls !== undefined && { inboundCalls: voiceData.inboundCalls })));
         }
         catch (e) {
             console.error("Error fetching dashboard stats: " + e);
