@@ -256,7 +256,7 @@ class VoiceDataService extends _root_1.default {
     }
     ;
     async dashboard_stats(req, res, next) {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
         try {
             const clientId = req.user._id;
             const body = req.body;
@@ -311,21 +311,63 @@ class VoiceDataService extends _root_1.default {
                     totalCalls: ((_e = stats[0]) === null || _e === void 0 ? void 0 : _e.totalCalls) || 0,
                     totalCallsTransferred: ((_f = stats[0]) === null || _f === void 0 ? void 0 : _f.totalTransffered) || 0,
                 };
-                // const answeredCalls = stats[0].totalCallAnswered || 0;
-                // const totalCalls = stats[0].totalCalls || 0;
-                // const callDuration = stats[0].totalCallDuration || 0;
-                // const date = job.scheduledTime.split("T")[0];
-                // console.log("date: ", date);
-                // const convertedCallDuration = convertMsToMinSec(callDuration);
-                // const answerRate = (answeredCalls / totalCalls) * 100;
-                // const automatedRate = (automatedResponse / totalCalls) * 100;
-                // const totalContactForAgent =
             }
             else if (dateOption) {
+                if (!Object.values(types_1.DateOption).includes(dateOption)) {
+                    return res.status(400).json({ error: "Invalid date option" });
+                }
+                ;
+                const dateFilters = await (0, client_1.DateFilterObjects)(dateOption, agentId);
+                console.log("Date Filters: ", dateFilters);
+                const { dateFilter, dateFilter2, date_to_check } = dateFilters;
+                const stats = await logModel_1.DailyStatsModel.aggregate([
+                    {
+                        $match: Object.assign({ agentId }, dateFilter2)
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            totalCalls: { $sum: "$totalCalls" },
+                            totalAnsweredByVm: { $sum: "$totalAnsweredByVm" },
+                            totalAppointment: { $sum: "$totalAppointment" },
+                            totalCallsTransffered: { $sum: "$totalTransffered" },
+                            totalFailedCalls: { $sum: "$totalFailed" },
+                            totalAnsweredCalls: { $sum: "$totalCallAnswered" },
+                            totalAnsweredByIVR: { $sum: "$totalAnsweredByIVR" },
+                            totalCallInactivity: { $sum: "$totalCallInactivity" },
+                            totalCallDuration: { $sum: "$totalCallDuration" },
+                            totalDialNoAnswer: { $sum: "$totalDialNoAnswer" },
+                        }
+                    }
+                ]);
+                console.log("Stats: ", stats);
+                const automatedResponse = await historyModel_1.default.countDocuments(Object.assign({ agentId, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
+                voiceData = {
+                    answeredCalls: ((_g = stats[0]) === null || _g === void 0 ? void 0 : _g.totalAnsweredCalls) || 0,
+                    callDurationInMs: ((_h = stats[0]) === null || _h === void 0 ? void 0 : _h.totalCallDuration) || 0,
+                    automatedResponse,
+                    totalAppointments: ((_j = stats[0]) === null || _j === void 0 ? void 0 : _j.totalAppointment) || 0,
+                    totalCalls: ((_k = stats[0]) === null || _k === void 0 ? void 0 : _k.totalCalls) || 0,
+                    totalCallsTransferred: ((_l = stats[0]) === null || _l === void 0 ? void 0 : _l.totalCallsTransferred) || 0,
+                };
             }
             ;
             console.log("voice data: ", voiceData);
-            // Fetch dashboard stats logic here
+            const answerRate = (voiceData.answeredCalls / voiceData.totalCalls) * 100;
+            const automatedRate = (voiceData.automatedResponse / voiceData.totalCalls) * 100;
+            const callDurationInMinutes = (0, client_1.convertMsToMinSec)(voiceData.callDurationInMs);
+            console.log("Call Duration (Minutes): ", callDurationInMinutes);
+            return res.status(200).json({
+                totalContactForAgent,
+                totalAnsweredCalls: voiceData.answeredCalls,
+                answerRate: `${answerRate.toFixed(2)}%`,
+                callDuration: callDurationInMinutes,
+                totalAutomatedResponses: voiceData.automatedResponse,
+                automatedRate: `${automatedRate.toFixed(2)}%`,
+                totalAppointment: voiceData.totalAppointments,
+                totalCallsTransferred: voiceData.totalCallsTransferred,
+                totalCalls: voiceData.totalCalls,
+            });
         }
         catch (e) {
             console.error("Error fetching dashboard stats: " + e);
