@@ -2,7 +2,7 @@ import RootService from "../_root";
 import { Response, NextFunction } from "express";
 import { AuthRequest } from "../../middleware/authRequest";
 import callHistoryModel from "../../models/historyModel";
-import { VoiceKPISchema, DashboardSchema } from "../../validations/client/voice_data";
+import { VoiceKPISchema, DashboardSchema, CallHistorySchema } from "../../validations/client/voice_data";
 import { DateOption } from "../../utils/types";
 import { userModel } from "../../models/userModel";
 import { format, toZonedTime } from "date-fns-tz";
@@ -12,6 +12,7 @@ import { DateTime } from "luxon";
 import { date } from "joi";
 import { DailyStatsModel } from "../../models/logModel";
 import { AutomatedResponses, convertMsToMinSec, DateFilterObjects } from "../../utils/client";
+import { calloutcome } from "../../utils/types";
 
 
 class VoiceDataService extends RootService {
@@ -449,6 +450,246 @@ class VoiceDataService extends RootService {
 
         } catch (e) {
             console.error("Error fetching dashboard stats: " + e);
+            next(e);
+        };
+    };
+
+    async call_history(req: AuthRequest, res: Response, next: NextFunction) {
+        try {
+            const clientId = req.user._id;
+            const body = req.body;
+
+            const { error } = CallHistorySchema.validate(body, {
+                abortEarly: false
+            });
+            if (error) return this.handle_validation_errors(error, res, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return res.status(400).json({ error: "User not found" });
+            
+            const agentIds = check_user.agents.map(agent => agent.agentId);
+            if (agentIds.length === 0) return res.status(400).json({ error: "No agents found for this user" });
+
+            const { startDate, endDate, sentiment, date, status, tag, contact, disconnectionReason, callType, callOutcome, direction } = body;
+            const page = parseInt(body.page) || 1;
+            const pageSize = 100;
+            const skip = (page - 1) * pageSize;
+
+            let query: { [key: string]: any } = {
+                agentId: { $in: agentIds }
+            };
+
+            if ((startDate && !endDate) || (!startDate && endDate)) {
+                return res.status(400).json({ error: "Both start and end dates must be provided"});
+            };
+
+            if (startDate && endDate) {
+                query.startTimestamp = {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate)
+                }
+            };
+
+            if (date) {
+                query.date = date;
+            };
+
+            if (sentiment) {
+                const sentiments = ["positive", "negative", "neutral", "unknown"];
+
+                if (!sentiments.includes(sentiment)) {
+                    return res.status(400).json({ error: "Invalid sentiment" });
+                };
+                query.userSentiment = sentiment;
+            };
+
+            if (status) {
+                query.callStatus = status;
+            };
+
+            if (tag) {
+                const leadsWithTag = await contactModel.find({ tag, callId: { $exists: true, $ne: "" } }).select("callId").lean();
+
+                const callIds = leadsWithTag.map((lead) => lead.callId);
+
+                if (!callIds || callIds.length === 0) {
+                    return res.status(200).json({
+                        result: [],
+                        message: "No history found for the given tag"
+                    });
+                };
+
+                query.callId = { $in: callIds };
+            };
+
+            if (contact) {
+                const leadContacts = await contactModel.find({
+                    $or: [
+                        {
+                            firstname: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            lastname: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            email: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        },
+                        {
+                            phone: {
+                                $regex: contact,
+                                $options: "i"
+                            }
+                        }
+                    ],
+                    callId: {
+                        $exists: true,
+                        $ne: ""
+                    }
+                }).select("callId").lean();
+
+                const callIds = leadContacts.map((lead) => lead.callId);
+
+                if (!callIds || callIds.length === 0) {
+                    return res.status(200).json({
+                        result: [],
+                        message: "No history found for the given contact"
+                    });
+                };
+
+                query.callId = { $in: callIds };
+            };
+
+            if (disconnectionReason) {
+                const reasons = ["user_hangup", "agent_hangup", "dial_failed", "dial_no_answer", "inactivity", "call_transfer", "voicemail_reached", "machine_detected", "max_duration_reached", "concurrency_limit_reached", "dial_busy", "error"];
+
+                if (!reasons.includes(disconnectionReason)) {
+                    return res.status(400).json({ error: "Invalid disconnection reason" });
+                };
+
+                if (disconnectionReason === "error") {
+                    const errors = ["error_inbound_webhook", "error_llm_websocket_open", "error_llm_websocket_lost_connection", "error_llm_websocket_runtime", "error_llm_websocket_corrupt_payload", "error_frontend_corrupted_payload", "error_twilio", "error_no_audio_received", "error_asr", "error_retell", "error_unknown", "error_user_not_joined"];
+
+                    query.disconnectionReason = { $in: errors };
+                } else {
+                    query.disconnectionReason = disconnectionReason
+                };
+            };
+
+            if (callType) {
+                const callTypes = ["web_call", "phone_call"];
+
+                if (!callTypes.includes(callType)) {
+                    return res.status(400).json({ error: "Invalid call type" });
+                };
+
+                query.callType = callType;
+            };
+
+            if (callOutcome) {
+                const validOutcomes = Object.values(calloutcome);
+                                    
+                if (!validOutcomes.includes(callOutcome)) {
+                    return res.status(400).json({ error: "Invalid call outcome" });
+                };
+
+                query.call_outcome = callOutcome;
+            };
+
+            if (direction) {
+
+                const directions = ["inbound", "outbound"];
+
+                if (!directions.includes(direction)) {
+                    return res.status(400).json({ error: "Invalid call direction" });
+                };
+
+                query.direction = direction;
+            };
+
+            console.log("Query for call history: ", query);
+
+            const callHistory = await callHistoryModel
+                .find(query)
+                .sort({ startTimestamp: -1 })
+                .skip(skip)
+                .limit(pageSize)
+                .lean();
+
+            const callIds = callHistory.map(history => history.callId);
+            const leads = await contactModel.find({
+                callId: { $in: callIds }
+            }).lean();
+
+            const leadMap = new Map(leads.map(lead => [lead.callId, lead]));
+
+            const callHistories = callHistory.map(history => {
+                const lead = leadMap.get(history.callId);
+                const calledTimes = lead?.calledTimes || 0;
+                const lastCalled = lead?.datesCalled[0] || "";
+                const timestamp = history.startTimestamp || 0;
+                const time = DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
+                const formattedDuration = history.durationMs ? (() => {
+                    const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
+                    return `${durationParts[1]}:${durationParts[2]}`;
+                })() : "00:00";
+
+                const tagToDisplay = (lead?.tag && typeof lead.tag === "string") ? lead.tag.toLowerCase() : "";
+
+                return {
+                    callId: history.callId || "",
+                    firstName: history.userFirstname || "",
+                    lastName: history.userLastname || "",
+                    email: history.userEmail || "",
+                    phone: history.toNumber || "",
+                    agentId: history.agentId || "",
+                    duration: formattedDuration,
+                    status: history.callStatus || "",
+                    dial_status: history.dial_status || "",
+                    transcript: history.transcript || "",
+                    sentiment: history.userSentiment || "",
+                    timestamp: history.endTimestamp || "",
+                    summary: history.callSummary || "",
+                    recording: history.recordingUrl || "",
+                    address: history.address || "",
+                    callAttempts: calledTimes || 0,
+                    lastCalled,
+                    time,
+                    callType: history.callType || "",
+                    disconnectionReason: history.disconnectionReason || "",
+                    direction: history.direction || "",
+                    callOutcome: history.call_outcome || "",
+                    notes: history.notes || "",
+                    tag: tagToDisplay
+                };
+            });
+
+            const totalRecords = await callHistoryModel.countDocuments(query);
+            const totalPages = Math.ceil(totalRecords / pageSize);
+
+            if (page > totalPages) {
+                return res.status(404).json({
+                    error: "Page exceeds available data"
+                });
+            };
+
+            return res.status(200).json({
+                callHistories,
+                totalRecords,
+                totalPages,
+                page
+            });
+
+        } catch (e) {
+            console.error("Error fetching call history: " + e);
             next(e);
         };
     };

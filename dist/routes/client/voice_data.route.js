@@ -11,5 +11,6 @@ const router = express_1.default.Router();
 router
     .post("/voice-kpi", authenticate, (req, res, next) => voice_data_1.voice_data_service.voice_kpi(req, res, next))
     .get("/schedule-history", authenticate, (req, res, next) => voice_data_1.voice_data_service.schedule_history(req, res, next))
-    .post("/dashboard", authenticate, (req, res, next) => voice_data_1.voice_data_service.dashboard_stats(req, res, next));
+    .post("/dashboard", authenticate, (req, res, next) => voice_data_1.voice_data_service.dashboard_stats(req, res, next))
+    .post("/history", authenticate, (req, res, next) => voice_data_1.voice_data_service.call_history(req, res, next));
 exports.default = router;

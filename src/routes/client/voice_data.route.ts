@@ -14,5 +14,7 @@ router
 
     .post("/dashboard", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => voice_data_service.dashboard_stats(req, res, next))
 
+    .post("/history", authenticate, (req: AuthRequest, res: Response, next: NextFunction) => voice_data_service.call_history(req, res, next))
+
 
 export default router;

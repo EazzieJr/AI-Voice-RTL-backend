@@ -27,501 +27,501 @@ import path from "path";
 import { unsubscribe } from "diagnostics_channel";
 
 class ClientService extends RootService {
-    async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
-        try {
-            const clientId = req.user._id;
-            const body = req.body;
+    // async dashboard_stats(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+    //     try {
+    //         const clientId = req.user._id;
+    //         const body = req.body;
 
-            const { error } = DashboardSchema.validate(body, {
-                abortEarly: false
-            });
-            if (error) return this.handle_validation_errors(error, res, next);
+    //         const { error } = DashboardSchema.validate(body, {
+    //             abortEarly: false
+    //         });
+    //         if (error) return this.handle_validation_errors(error, res, next);
 
-            const check_user = await userModel.findById(clientId);
-            if (!check_user) return res.status(400).json({ error: "User not found"});
+    //         const check_user = await userModel.findById(clientId);
+    //         if (!check_user) return res.status(400).json({ error: "User not found"});
 
-            const agentIds = check_user.agents.map((agent) => agent.agentId);
-            const dateOption = req.body.dateOption as DateOption;
-            // const { agentIds } = body;
+    //         const agentIds = check_user.agents.map((agent) => agent.agentId);
+    //         const dateOption = req.body.dateOption as DateOption;
+    //         // const { agentIds } = body;
 
-            console.log("agentIds: ", agentIds);
+    //         console.log("agentIds: ", agentIds);
 
-            if (!Object.values(DateOption).includes(dateOption)) {
-                return res.status(400).json({ error: "Invalid date option" })
-            };
+    //         if (!Object.values(DateOption).includes(dateOption)) {
+    //             return res.status(400).json({ error: "Invalid date option" })
+    //         };
 
-            let dateFilter = {};
-            let dateFilter2 = {};
-            let date_to_check: {};
+    //         let dateFilter = {};
+    //         let dateFilter2 = {};
+    //         let date_to_check: {};
 
-            const timeZone = "America/Los_Angeles";
-            const now = new Date();
-            const zonedNow = toZonedTime(now, timeZone);
-            const today = format(zonedNow, "yyyy-MM-dd", { timeZone });
+    //         const timeZone = "America/Los_Angeles";
+    //         const now = new Date();
+    //         const zonedNow = toZonedTime(now, timeZone);
+    //         const today = format(zonedNow, "yyyy-MM-dd", { timeZone });
 
-            switch (dateOption) {
-                case DateOption.Today:
-                    dateFilter = { datesCalled: today };
-                    dateFilter2 = { day: today };
-                    date_to_check = { date: today };
+    //         switch (dateOption) {
+    //             case DateOption.Today:
+    //                 dateFilter = { datesCalled: today };
+    //                 dateFilter2 = { day: today };
+    //                 date_to_check = { date: today };
 
-                    break;
+    //                 break;
                 
-                case DateOption.Yesterday:
-                    const zonedYesterday = toZonedTime(subDays(now, 1), timeZone);
-                    const yesterday = format(zonedYesterday, "yyyy-MM-dd", { timeZone });
-
-                    dateFilter = { datesCalled: yesterday };
-                    dateFilter2 = { day: yesterday };
-                    date_to_check = { date: yesterday };
-                    break;
-
-                case DateOption.ThisWeek:
-                    const weekdays: string[] = [];
-                    for (let i = 0; i < 7; i++) {
-                        const day = subDays(zonedNow, i);
-                        const dayOfWeek = day.getDay();
-                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                            const valid_day = format(day, "yyyy-MM-dd", { timeZone });
-                            weekdays.push(valid_day);
-                        };
-                    };
-
-                    dateFilter = { datesCalled: { $in: weekdays }};
-                    dateFilter2 = { day: { $in: weekdays }};
-                    date_to_check = { date: { $in: weekdays } };
-
-                    break;
-
-                case DateOption.ThisMonth:
-                    const monthDates: string[] = [];
-                    for (let i = 0; i < now.getDate(); i++) {
-                        const day = subDays(now, i);
-                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
-                        monthDates.unshift(valid_day);
-                    };
-
-                    dateFilter = { datesCalled: { $in: monthDates } };
-                    dateFilter2 = { day: { $in: monthDates } };
-                    date_to_check = { date: { $in: monthDates } };
-
-                    break;
-
-                case DateOption.PastMonth:
-                    const pastDates: string[] = [];
-                    for (let i = 0; i < 30; i++) {
-                        const day = subDays(now, i);
-                        const valid_day = format(day, "yyyy-MM-dd", { timeZone });
-                        pastDates.unshift(valid_day);
-                    };
-
-                    dateFilter = { datesCalled: { $in: pastDates } };
-                    dateFilter2 = { day: { $in: pastDates } };
-                    date_to_check = { date: { $in: pastDates } };
-
-                    break;
-
-                case DateOption.Total:
-                    dateFilter = {};
-                    dateFilter2 = {};
-                    date_to_check = {};
-
-                    break;
-
-                case DateOption.LAST_SCHEDULE:
-                    const recent_job = await jobModel
-                        .findOne({ agentId: { $in: agentIds} })
-                        .sort({ createdAt: -1 })
-                        .lean();
-
-                    if (!recent_job) {
-                        dateFilter = {};
-                        dateFilter2 = {};
-                        date_to_check = {};
-                    } else {
-                        const dateToCheck = recent_job.scheduledTime.split("T")[0];
-
-                        dateFilter = { datesCalled: dateToCheck };
-                        dateFilter2 = { day: dateToCheck };
-                        date_to_check = { date: dateToCheck };
-                    };
-
-                    break;
-            };
-
-            const totalContactForAgent = await contactModel.countDocuments({
-                agentId: { $in: agentIds },
-                isDeleted: false
-            });
-
-            // const totalNotCalledForAgent = await contactModel.countDocuments({
-            //     agentId: { $in: agentIds },
-            //     isDeleted: false,
-            //     dial_status: callstatusenum.NOT_CALLED,
-            //     ...dateFilter
-            // });
-
-            const totalAnsweredCalls = await contactModel.countDocuments({
-                agentId: { $in: agentIds },
-                isDeleted: false,
-                dial_status: callstatusenum.CALLED,
-                ...dateFilter
-            });
-
-            const totalAppointments = await callHistoryModel.countDocuments({
-                agentId: { $in: agentIds },
-                userSentiment: "scheduled",
-                ...date_to_check
-            });
-
-            let conversionRate;
-            let averageCallDuration;
-
-            console.log("Appointments: ", totalAppointments);
-
-            const stats = await DailyStatsModel.aggregate([
-                {
-                    $match: {
-                        agentId: { $in: agentIds },
-                        ...dateFilter2
-                    }
-                },
-                {
-                    $group: {
-                        _id: null,
-                        totalCalls: { $sum: "$totalCalls" },
-                        totalAnsweredByVm: { $sum: "$totalAnsweredByVm" },
-                        totalAppointment: { $sum: "$totalAppointment" },
-                        totalCallsTransffered: { $sum: "$totalTransffered" },
-                        totalFailedCalls: { $sum: "$totalFailed" },
-                        totalAnsweredCalls: { $sum: "$totalCallAnswered" },
-                        totalAnsweredByIVR: { $sum: "$totalAnsweredByIVR" },
-                        totalCallInactivity: { $sum: "$totalCallInactivity" },
-                        totalCallDuration: { $sum: "$totalCallDuration" },
-                        totalDialNoAnswer: { $sum: "$totalDialNoAnswer" },
-                    }
-                }
-            ]);
-
-            console.log("total answered calls: ", stats[0]?.totalAnsweredCalls);
-
-            function convertMsToMinSec(ms: number): string {
-                const totalSeconds = Math.floor(ms / 1000);
-                const minutes = Math.floor(totalSeconds / 60);
-                const seconds = totalSeconds % 60;
-
-                return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-            };
-
-            const combinedCallDuration = convertMsToMinSec(stats[0]?.totalCallDuration || 0);
-
-            const totalCalls = stats[0]?.totalCalls || 0;
-
-            const answerRate = (totalAnsweredCalls / totalCalls) * 100;
-
-
-            if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
-
-                conversionRate = (totalAppointments / totalAnsweredCalls) * 100 || 0;
-                console.log("Conversion Rate: ", conversionRate);
-
-                if (totalAnsweredCalls > 0) {
-                    const totalDuration = stats[0]?.totalCallDuration || 0;
-                    const averageDuration = totalDuration / totalAnsweredCalls;
-
-                    averageCallDuration = convertMsToMinSec(averageDuration);
-                    console.log("Average Call Duration: ", averageCallDuration);
-
-                } else {
-                    averageCallDuration = "00:00";
-                };
-            };
-
-            // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
-            const automatedAnswers = await callHistoryModel.countDocuments({
-                agentId: { $in: agentIds },
-                disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] },
-                ...date_to_check
-            });
-
-            const inboundCalls = await callHistoryModel.countDocuments({
-                agentId: { $in: agentIds },
-                direction: "inbound",
-                ...date_to_check
-            });
-
-            console.log("Inbound Calls: ", inboundCalls);
-            console.log("automatedAnswers: ", automatedAnswers);
-
-            const automatedRate = (automatedAnswers / totalCalls) * 100;
-
-            return res.status(200).json({
-                totalContactForAgent,
-                totalAnsweredCalls,
-                answerRate: `${answerRate.toFixed(2)}%`,
-                // totalNotCalledForAgent,
-                callDuration: combinedCallDuration,
-                totalAutomatedAnswers: automatedAnswers,
-                automatedRate: `${automatedRate.toFixed(2)}%`,
-                // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
-                totalAppointment: totalAppointments,
-                totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
-                totalCalls,
-                ...(conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` }),
-                ...(averageCallDuration !== undefined && { averageCallDuration }),
-                inboundCalls,
-                // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
-                // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
-                // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
-                // totalCallInactivity: stats[0]?.totalCallInactivity || 0
-            });
-
-        } catch (error) {
-            console.error("Error fetching dashboard stats: ", error);
-            next(error);
-        };
-    };
-
-    async call_history(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
-        try {
-            const clientId = req.user._id;
-            const body = req.body;
-
-            const { error } = CallHistorySchema.validate(body, { abortEarly: false } );
-            if (error) return this.handle_validation_errors(error, res, next);
-
-            const check_user = await userModel.findById(clientId);
-            if (!check_user) return res.status(400).json({ error: "User not found"});
-
-            const agentIds = check_user.agents.map((agent) => agent.agentId);
-
-            const { startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome, direction } = body;
-            const page = parseInt(body.page) || 1;
-
-            console.log("agentIds: ", agentIds);
-
-            const pageSize = 100;
-            const skip = (page - 1) * pageSize;
-
-            let query: { [key: string]: any } = {
-                agentId: { $in: agentIds }
-            };
-
-            if ((startDate && !endDate) || (!startDate && endDate)) {
-                return res.status(400).json({ error: "Both start and end dates must be provided"});
-            };
-
-            if (startDate && endDate) {
-                query.startTimestamp = {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                }
-            };
-
-            if (date) {
-                query.date = date;
-            };
-
-            if (sentiment) {
-                const sentiments = ["positive", "negative", "neutral", "unknown"];
-
-                if (!sentiments.includes(sentiment)) {
-                    return res.status(400).json({ error: "Invalid sentiment" });
-                };
-                query.userSentiment = sentiment;
-            };
-
-            if (status) {
-                query.callStatus = status;
-            };
-
-            if (tag) {
-                const leadsWithTag = await contactModel.find({ tag, callId: { $exists: true, $ne: "" } }).select("callId").lean();
-
-                const callIds = leadsWithTag.map((lead) => lead.callId);
-
-                if (!callIds || callIds.length === 0) {
-                    return res.status(200).json({
-                        result: [],
-                        message: "No history found for the given tag"
-                    });
-                };
-
-                query.callId = { $in: callIds}
-            };
-
-            if (contact) {
-                const leadContacts = await contactModel.find({
-                    $or: [
-                        {
-                            firstname: {
-                                $regex: contact,
-                                $options: "i"
-                            }
-                        },
-                        {
-                            lastname: {
-                                $regex: contact,
-                                $options: "i"
-                            }
-                        },
-                        {
-                            email: {
-                                $regex: contact,
-                                $options: "i"
-                            }
-                        },
-                        {
-                            phone: {
-                                $regex: contact,
-                                $options: "i"
-                            }
-                        }
-                    ],
-                    callId: {
-                        $exists: true,
-                        $ne: ""
-                    }
-                }).select("callId").lean();
-
-                const callIds = leadContacts.map((lead) => lead.callId);
-
-                if (!callIds || callIds.length === 0) {
-                    return res.status(200).json({
-                        result: [],
-                        message: "No history found for the given contact"
-                    });
-                };
-
-                query.callId = { $in: callIds };
-
-            };
-
-            if (disconnectionReason) {
-                const reasons = ["user_hangup", "agent_hangup", "dial_failed", "dial_no_answer", "inactivity", "call_transfer", "voicemail_reached", "machine_detected", "max_duration_reached", "concurrency_limit_reached", "dial_busy", "error"];
-
-                if (!reasons.includes(disconnectionReason)) {
-                    return res.status(400).json({ error: "Invalid disconnection reason" });
-                };
-
-                if (disconnectionReason === "error") {
-                    const errors = ["error_inbound_webhook", "error_llm_websocket_open", "error_llm_websocket_lost_connection", "error_llm_websocket_runtime", "error_llm_websocket_corrupt_payload", "error_frontend_corrupted_payload", "error_twilio", "error_no_audio_received", "error_asr", "error_retell", "error_unknown", "error_user_not_joined"];
-
-                    query.disconnectionReason = { $in: errors };
-                } else {
-                    query.disconnectionReason = disconnectionReason
-                };
-            };
-
-            if (callType) {
-                const callTypes = ["web_call", "phone_call"];
-
-                if (!callTypes.includes(callType)) {
-                    return res.status(400).json({ error: "Invalid call type" });
-                };
-
-                query.callType = callType
-            };
-
-            if (callOutcome) {
-                if (callOutcome) {
-                    const validOutcomes = Object.values(calloutcome);
+    //             case DateOption.Yesterday:
+    //                 const zonedYesterday = toZonedTime(subDays(now, 1), timeZone);
+    //                 const yesterday = format(zonedYesterday, "yyyy-MM-dd", { timeZone });
+
+    //                 dateFilter = { datesCalled: yesterday };
+    //                 dateFilter2 = { day: yesterday };
+    //                 date_to_check = { date: yesterday };
+    //                 break;
+
+    //             case DateOption.ThisWeek:
+    //                 const weekdays: string[] = [];
+    //                 for (let i = 0; i < 7; i++) {
+    //                     const day = subDays(zonedNow, i);
+    //                     const dayOfWeek = day.getDay();
+    //                     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+    //                         const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+    //                         weekdays.push(valid_day);
+    //                     };
+    //                 };
+
+    //                 dateFilter = { datesCalled: { $in: weekdays }};
+    //                 dateFilter2 = { day: { $in: weekdays }};
+    //                 date_to_check = { date: { $in: weekdays } };
+
+    //                 break;
+
+    //             case DateOption.ThisMonth:
+    //                 const monthDates: string[] = [];
+    //                 for (let i = 0; i < now.getDate(); i++) {
+    //                     const day = subDays(now, i);
+    //                     const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+    //                     monthDates.unshift(valid_day);
+    //                 };
+
+    //                 dateFilter = { datesCalled: { $in: monthDates } };
+    //                 dateFilter2 = { day: { $in: monthDates } };
+    //                 date_to_check = { date: { $in: monthDates } };
+
+    //                 break;
+
+    //             case DateOption.PastMonth:
+    //                 const pastDates: string[] = [];
+    //                 for (let i = 0; i < 30; i++) {
+    //                     const day = subDays(now, i);
+    //                     const valid_day = format(day, "yyyy-MM-dd", { timeZone });
+    //                     pastDates.unshift(valid_day);
+    //                 };
+
+    //                 dateFilter = { datesCalled: { $in: pastDates } };
+    //                 dateFilter2 = { day: { $in: pastDates } };
+    //                 date_to_check = { date: { $in: pastDates } };
+
+    //                 break;
+
+    //             case DateOption.Total:
+    //                 dateFilter = {};
+    //                 dateFilter2 = {};
+    //                 date_to_check = {};
+
+    //                 break;
+
+    //             case DateOption.LAST_SCHEDULE:
+    //                 const recent_job = await jobModel
+    //                     .findOne({ agentId: { $in: agentIds} })
+    //                     .sort({ createdAt: -1 })
+    //                     .lean();
+
+    //                 if (!recent_job) {
+    //                     dateFilter = {};
+    //                     dateFilter2 = {};
+    //                     date_to_check = {};
+    //                 } else {
+    //                     const dateToCheck = recent_job.scheduledTime.split("T")[0];
+
+    //                     dateFilter = { datesCalled: dateToCheck };
+    //                     dateFilter2 = { day: dateToCheck };
+    //                     date_to_check = { date: dateToCheck };
+    //                 };
+
+    //                 break;
+    //         };
+
+    //         const totalContactForAgent = await contactModel.countDocuments({
+    //             agentId: { $in: agentIds },
+    //             isDeleted: false
+    //         });
+
+    //         // const totalNotCalledForAgent = await contactModel.countDocuments({
+    //         //     agentId: { $in: agentIds },
+    //         //     isDeleted: false,
+    //         //     dial_status: callstatusenum.NOT_CALLED,
+    //         //     ...dateFilter
+    //         // });
+
+    //         const totalAnsweredCalls = await contactModel.countDocuments({
+    //             agentId: { $in: agentIds },
+    //             isDeleted: false,
+    //             dial_status: callstatusenum.CALLED,
+    //             ...dateFilter
+    //         });
+
+    //         const totalAppointments = await callHistoryModel.countDocuments({
+    //             agentId: { $in: agentIds },
+    //             userSentiment: "scheduled",
+    //             ...date_to_check
+    //         });
+
+    //         let conversionRate;
+    //         let averageCallDuration;
+
+    //         console.log("Appointments: ", totalAppointments);
+
+    //         const stats = await DailyStatsModel.aggregate([
+    //             {
+    //                 $match: {
+    //                     agentId: { $in: agentIds },
+    //                     ...dateFilter2
+    //                 }
+    //             },
+    //             {
+    //                 $group: {
+    //                     _id: null,
+    //                     totalCalls: { $sum: "$totalCalls" },
+    //                     totalAnsweredByVm: { $sum: "$totalAnsweredByVm" },
+    //                     totalAppointment: { $sum: "$totalAppointment" },
+    //                     totalCallsTransffered: { $sum: "$totalTransffered" },
+    //                     totalFailedCalls: { $sum: "$totalFailed" },
+    //                     totalAnsweredCalls: { $sum: "$totalCallAnswered" },
+    //                     totalAnsweredByIVR: { $sum: "$totalAnsweredByIVR" },
+    //                     totalCallInactivity: { $sum: "$totalCallInactivity" },
+    //                     totalCallDuration: { $sum: "$totalCallDuration" },
+    //                     totalDialNoAnswer: { $sum: "$totalDialNoAnswer" },
+    //                 }
+    //             }
+    //         ]);
+
+    //         console.log("total answered calls: ", stats[0]?.totalAnsweredCalls);
+
+    //         function convertMsToMinSec(ms: number): string {
+    //             const totalSeconds = Math.floor(ms / 1000);
+    //             const minutes = Math.floor(totalSeconds / 60);
+    //             const seconds = totalSeconds % 60;
+
+    //             return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    //         };
+
+    //         const combinedCallDuration = convertMsToMinSec(stats[0]?.totalCallDuration || 0);
+
+    //         const totalCalls = stats[0]?.totalCalls || 0;
+
+    //         const answerRate = (totalAnsweredCalls / totalCalls) * 100;
+
+
+    //         if (check_user.clientType === "inbound" || check_user.clientType === "voice") {
+
+    //             conversionRate = (totalAppointments / totalAnsweredCalls) * 100 || 0;
+    //             console.log("Conversion Rate: ", conversionRate);
+
+    //             if (totalAnsweredCalls > 0) {
+    //                 const totalDuration = stats[0]?.totalCallDuration || 0;
+    //                 const averageDuration = totalDuration / totalAnsweredCalls;
+
+    //                 averageCallDuration = convertMsToMinSec(averageDuration);
+    //                 console.log("Average Call Duration: ", averageCallDuration);
+
+    //             } else {
+    //                 averageCallDuration = "00:00";
+    //             };
+    //         };
+
+    //         // const automatedAnswers = (stats[0]?.totalAnsweredByVm || 0) + (stats[0]?.totalAnsweredByIVR || 0);
+    //         const automatedAnswers = await callHistoryModel.countDocuments({
+    //             agentId: { $in: agentIds },
+    //             disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] },
+    //             ...date_to_check
+    //         });
+
+    //         const inboundCalls = await callHistoryModel.countDocuments({
+    //             agentId: { $in: agentIds },
+    //             direction: "inbound",
+    //             ...date_to_check
+    //         });
+
+    //         console.log("Inbound Calls: ", inboundCalls);
+    //         console.log("automatedAnswers: ", automatedAnswers);
+
+    //         const automatedRate = (automatedAnswers / totalCalls) * 100;
+
+    //         return res.status(200).json({
+    //             totalContactForAgent,
+    //             totalAnsweredCalls,
+    //             answerRate: `${answerRate.toFixed(2)}%`,
+    //             // totalNotCalledForAgent,
+    //             callDuration: combinedCallDuration,
+    //             totalAutomatedAnswers: automatedAnswers,
+    //             automatedRate: `${automatedRate.toFixed(2)}%`,
+    //             // totalAnsweredByVm: stats[0]?.totalAnsweredByVm || 0,
+    //             totalAppointment: totalAppointments,
+    //             totalCallsTransferred: stats[0]?.totalCallsTransffered || 0,
+    //             totalCalls,
+    //             ...(conversionRate !== undefined && { conversionRate: `${conversionRate.toFixed(2)}%` }),
+    //             ...(averageCallDuration !== undefined && { averageCallDuration }),
+    //             inboundCalls,
+    //             // totalFailedCalls: stats[0]?.totalFailedCalls || 0,
+    //             // totalAnsweredByIVR: stats[0]?.totalAnsweredByIVR || 0,
+    //             // totalDialNoAnswer: stats[0]?.totalDialNoAnswer || 0,
+    //             // totalCallInactivity: stats[0]?.totalCallInactivity || 0
+    //         });
+
+    //     } catch (error) {
+    //         console.error("Error fetching dashboard stats: ", error);
+    //         next(error);
+    //     };
+    // };
+
+    // async call_history(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
+    //     try {
+    //         const clientId = req.user._id;
+    //         const body = req.body;
+
+    //         const { error } = CallHistorySchema.validate(body, { abortEarly: false } );
+    //         if (error) return this.handle_validation_errors(error, res, next);
+
+    //         const check_user = await userModel.findById(clientId);
+    //         if (!check_user) return res.status(400).json({ error: "User not found"});
+
+    //         const agentIds = check_user.agents.map((agent) => agent.agentId);
+
+    //         const { startDate, endDate, date, sentiment, status, tag, contact, disconnectionReason, callType, callOutcome, direction } = body;
+    //         const page = parseInt(body.page) || 1;
+
+    //         console.log("agentIds: ", agentIds);
+
+    //         const pageSize = 100;
+    //         const skip = (page - 1) * pageSize;
+
+    //         let query: { [key: string]: any } = {
+    //             agentId: { $in: agentIds }
+    //         };
+
+    //         if ((startDate && !endDate) || (!startDate && endDate)) {
+    //             return res.status(400).json({ error: "Both start and end dates must be provided"});
+    //         };
+
+    //         if (startDate && endDate) {
+    //             query.startTimestamp = {
+    //                 $gte: new Date(startDate),
+    //                 $lte: new Date(endDate)
+    //             }
+    //         };
+
+    //         if (date) {
+    //             query.date = date;
+    //         };
+
+    //         if (sentiment) {
+    //             const sentiments = ["positive", "negative", "neutral", "unknown"];
+
+    //             if (!sentiments.includes(sentiment)) {
+    //                 return res.status(400).json({ error: "Invalid sentiment" });
+    //             };
+    //             query.userSentiment = sentiment;
+    //         };
+
+    //         if (status) {
+    //             query.callStatus = status;
+    //         };
+
+    //         if (tag) {
+    //             const leadsWithTag = await contactModel.find({ tag, callId: { $exists: true, $ne: "" } }).select("callId").lean();
+
+    //             const callIds = leadsWithTag.map((lead) => lead.callId);
+
+    //             if (!callIds || callIds.length === 0) {
+    //                 return res.status(200).json({
+    //                     result: [],
+    //                     message: "No history found for the given tag"
+    //                 });
+    //             };
+
+    //             query.callId = { $in: callIds}
+    //         };
+
+    //         if (contact) {
+    //             const leadContacts = await contactModel.find({
+    //                 $or: [
+    //                     {
+    //                         firstname: {
+    //                             $regex: contact,
+    //                             $options: "i"
+    //                         }
+    //                     },
+    //                     {
+    //                         lastname: {
+    //                             $regex: contact,
+    //                             $options: "i"
+    //                         }
+    //                     },
+    //                     {
+    //                         email: {
+    //                             $regex: contact,
+    //                             $options: "i"
+    //                         }
+    //                     },
+    //                     {
+    //                         phone: {
+    //                             $regex: contact,
+    //                             $options: "i"
+    //                         }
+    //                     }
+    //                 ],
+    //                 callId: {
+    //                     $exists: true,
+    //                     $ne: ""
+    //                 }
+    //             }).select("callId").lean();
+
+    //             const callIds = leadContacts.map((lead) => lead.callId);
+
+    //             if (!callIds || callIds.length === 0) {
+    //                 return res.status(200).json({
+    //                     result: [],
+    //                     message: "No history found for the given contact"
+    //                 });
+    //             };
+
+    //             query.callId = { $in: callIds };
+
+    //         };
+
+    //         if (disconnectionReason) {
+    //             const reasons = ["user_hangup", "agent_hangup", "dial_failed", "dial_no_answer", "inactivity", "call_transfer", "voicemail_reached", "machine_detected", "max_duration_reached", "concurrency_limit_reached", "dial_busy", "error"];
+
+    //             if (!reasons.includes(disconnectionReason)) {
+    //                 return res.status(400).json({ error: "Invalid disconnection reason" });
+    //             };
+
+    //             if (disconnectionReason === "error") {
+    //                 const errors = ["error_inbound_webhook", "error_llm_websocket_open", "error_llm_websocket_lost_connection", "error_llm_websocket_runtime", "error_llm_websocket_corrupt_payload", "error_frontend_corrupted_payload", "error_twilio", "error_no_audio_received", "error_asr", "error_retell", "error_unknown", "error_user_not_joined"];
+
+    //                 query.disconnectionReason = { $in: errors };
+    //             } else {
+    //                 query.disconnectionReason = disconnectionReason
+    //             };
+    //         };
+
+    //         if (callType) {
+    //             const callTypes = ["web_call", "phone_call"];
+
+    //             if (!callTypes.includes(callType)) {
+    //                 return res.status(400).json({ error: "Invalid call type" });
+    //             };
+
+    //             query.callType = callType
+    //         };
+
+    //         if (callOutcome) {
+    //             if (callOutcome) {
+    //                 const validOutcomes = Object.values(calloutcome);
                     
-                    if (!validOutcomes.includes(callOutcome)) {
-                        return res.status(400).json({ error: "Invalid call outcome" });
-                    };
+    //                 if (!validOutcomes.includes(callOutcome)) {
+    //                     return res.status(400).json({ error: "Invalid call outcome" });
+    //                 };
 
-                    query.call_outcome = callOutcome;
-                };
-            };
+    //                 query.call_outcome = callOutcome;
+    //             };
+    //         };
 
-            if (direction) {
-                const directions = ["inbound", "outbound"];
+    //         if (direction) {
+    //             const directions = ["inbound", "outbound"];
 
-                if (!directions.includes(direction)) {
-                    return res.status(400).json({ error: "Invalid call direction" });
-                };
+    //             if (!directions.includes(direction)) {
+    //                 return res.status(400).json({ error: "Invalid call direction" });
+    //             };
 
-                query.direction = direction;
-            }
+    //             query.direction = direction;
+    //         }
 
-            console.log("query: ", query);
+    //         console.log("query: ", query);
 
-            const callHistory = await callHistoryModel
-                .find(query)
-                .sort({ startTimestamp: -1 })
-                .skip(skip)
-                .limit(pageSize)
-                .lean();
+    //         const callHistory = await callHistoryModel
+    //             .find(query)
+    //             .sort({ startTimestamp: -1 })
+    //             .skip(skip)
+    //             .limit(pageSize)
+    //             .lean();
 
-            if (!callHistory || callHistory.length === 0) {
-                return res.status(200).json({
-                    message: "No Call history found"
-                });
-            };
+    //         if (!callHistory || callHistory.length === 0) {
+    //             return res.status(200).json({
+    //                 message: "No Call history found"
+    //             });
+    //         };
 
-            const callHistories = await Promise.all(callHistory.map(async (history) => {
-                const lead = await contactModel.findOne({ callId: history.callId }).lean();
-                const calledTimes = lead?.calledTimes || 0;
-                const lastCalled = lead?.datesCalled[0] || "";
-                const timestamp = history.startTimestamp || 0;
-                const time = DateTime.fromMillis(timestamp).toFormat('MM/dd/yyyy HH:mm');
-                const formattedDuration = history.durationMs ? (() => {
-                    const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
-                    return `${durationParts[1]}:${durationParts[2]}`;
-                })() : "00:00";
-                const tagToDisplay = (lead?.tag && typeof lead.tag === "string") ? lead.tag.toLowerCase() : "";
+    //         const callHistories = await Promise.all(callHistory.map(async (history) => {
+    //             const lead = await contactModel.findOne({ callId: history.callId }).lean();
+    //             const calledTimes = lead?.calledTimes || 0;
+    //             const lastCalled = lead?.datesCalled[0] || "";
+    //             const timestamp = history.startTimestamp || 0;
+    //             const time = DateTime.fromMillis(timestamp).toFormat('MM/dd/yyyy HH:mm');
+    //             const formattedDuration = history.durationMs ? (() => {
+    //                 const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
+    //                 return `${durationParts[1]}:${durationParts[2]}`;
+    //             })() : "00:00";
+    //             const tagToDisplay = (lead?.tag && typeof lead.tag === "string") ? lead.tag.toLowerCase() : "";
 
-                return {
-                    callId: history.callId || "",
-                    firstName: history.userFirstname || "",
-                    lastName: history.userLastname || "",
-                    email: history.userEmail || "",
-                    phone: history.toNumber || "",
-                    agentId: history.agentId || "",
-                    duration: formattedDuration || "",
-                    status: history.callStatus || "",
-                    dial_status: history.dial_status || "",
-                    transcript: history.transcript || "",
-                    sentiment: history.userSentiment || "",
-                    timestamp: history.endTimestamp || "",
-                    summary: history.callSummary || "",
-                    recording: history.recordingUrl || "",
-                    address: history.address || "",
-                    callAttempts: calledTimes || 0, // Add the calledTimes field
-                    lastCalled,
-                    time,
-                    callType: history.callType || "",
-                    disconnectionReason: history.disconnectionReason || "",
-                    direction: history.direction || "",
-                    callOutcome: history.call_outcome || "",
-                    notes: history.notes || "",
-                    tag: tagToDisplay || "",
-                };
+    //             return {
+    //                 callId: history.callId || "",
+    //                 firstName: history.userFirstname || "",
+    //                 lastName: history.userLastname || "",
+    //                 email: history.userEmail || "",
+    //                 phone: history.toNumber || "",
+    //                 agentId: history.agentId || "",
+    //                 duration: formattedDuration || "",
+    //                 status: history.callStatus || "",
+    //                 dial_status: history.dial_status || "",
+    //                 transcript: history.transcript || "",
+    //                 sentiment: history.userSentiment || "",
+    //                 timestamp: history.endTimestamp || "",
+    //                 summary: history.callSummary || "",
+    //                 recording: history.recordingUrl || "",
+    //                 address: history.address || "",
+    //                 callAttempts: calledTimes || 0, // Add the calledTimes field
+    //                 lastCalled,
+    //                 time,
+    //                 callType: history.callType || "",
+    //                 disconnectionReason: history.disconnectionReason || "",
+    //                 direction: history.direction || "",
+    //                 callOutcome: history.call_outcome || "",
+    //                 notes: history.notes || "",
+    //                 tag: tagToDisplay || "",
+    //             };
 
-            }));
+    //         }));
 
-            const totalRecords = await callHistoryModel.countDocuments(query);
-            const totalPages = Math.ceil(totalRecords / pageSize);
+    //         const totalRecords = await callHistoryModel.countDocuments(query);
+    //         const totalPages = Math.ceil(totalRecords / pageSize);
 
-            if (page > totalPages) {
-                return res.status(400).json({
-                    error: "Page exceeds available data"
-                });
-            };
+    //         if (page > totalPages) {
+    //             return res.status(400).json({
+    //                 error: "Page exceeds available data"
+    //             });
+    //         };
 
-            return res.status(200).json({
-                callHistories,
-                totalRecords,
-                totalPages,
-                page
-            });
+    //         return res.status(200).json({
+    //             callHistories,
+    //             totalRecords,
+    //             totalPages,
+    //             page
+    //         });
 
-        } catch (error) {
-            console.error("Error fetching call history: ", error);
-            next(error);
-        };
-    };
+    //     } catch (error) {
+    //         console.error("Error fetching call history: ", error);
+    //         next(error);
+    //     };
+    // };
 
     async upload_csv(req: AuthRequest, res: Response, next: NextFunction): Promise<Response> {
         try {
