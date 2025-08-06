@@ -388,6 +388,7 @@ class Server {
                         // Batch query to find existing users
                         const phoneNumbersToCheck = usersWithAgentId.map((user) => user.phone);
                         const existingUsers = await contact_model_1.contactModel.find({
+                            agentId,
                             isDeleted: false,
                             phone: { $in: phoneNumbersToCheck },
                         });

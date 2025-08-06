@@ -477,6 +477,7 @@ export class Server {
                 (user) => user.phone,
               );
               const existingUsers = await contactModel.find({
+                agentId,
                 isDeleted: false,
                 phone: { $in: phoneNumbersToCheck },
               });
