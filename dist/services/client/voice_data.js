@@ -257,7 +257,7 @@ class VoiceDataService extends _root_1.default {
     }
     ;
     async dashboard_stats(req, res, next) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
         try {
             const clientId = req.user._id;
             const body = req.body;
@@ -346,14 +346,19 @@ class VoiceDataService extends _root_1.default {
                 const automatedResponse = await historyModel_1.default.countDocuments(Object.assign({ agentId, disconnectionReason: { $in: ["voicemail_reached", "machine_detected"] } }, date_to_check));
                 const totalAppointments = ((_g = stats[0]) === null || _g === void 0 ? void 0 : _g.totalAppointment) || 0;
                 const answeredCalls = ((_h = stats[0]) === null || _h === void 0 ? void 0 : _h.totalAnsweredCalls) || 0;
-                const inboundCalls = await historyModel_1.default.countDocuments(Object.assign({ agentId, direction: "inbound" }, date_to_check));
+                const inboundAgent = (_j = check_user.agents.find(agent => agent.type === "inbound")) === null || _j === void 0 ? void 0 : _j.agentId;
+                let inboundCalls = 0;
+                if (inboundAgent) {
+                    inboundCalls = await historyModel_1.default.countDocuments(Object.assign({ agentId: inboundAgent, direction: "inbound" }, date_to_check));
+                }
+                ;
                 voiceData = {
                     answeredCalls,
-                    callDurationInMs: ((_j = stats[0]) === null || _j === void 0 ? void 0 : _j.totalCallDuration) || 0,
+                    callDurationInMs: ((_k = stats[0]) === null || _k === void 0 ? void 0 : _k.totalCallDuration) || 0,
                     automatedResponse,
                     totalAppointments,
-                    totalCalls: ((_k = stats[0]) === null || _k === void 0 ? void 0 : _k.totalCalls) || 0,
-                    totalCallsTransferred: ((_l = stats[0]) === null || _l === void 0 ? void 0 : _l.totalCallsTransferred) || 0,
+                    totalCalls: ((_l = stats[0]) === null || _l === void 0 ? void 0 : _l.totalCalls) || 0,
+                    totalCallsTransferred: ((_m = stats[0]) === null || _m === void 0 ? void 0 : _m.totalCallsTransferred) || 0,
                     inboundCalls
                 };
             }

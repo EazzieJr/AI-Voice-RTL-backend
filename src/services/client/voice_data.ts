@@ -393,12 +393,17 @@ class VoiceDataService extends RootService {
                 const totalAppointments = stats[0]?.totalAppointment || 0;
                 const answeredCalls = stats[0]?.totalAnsweredCalls || 0;
 
-                const inboundCalls = await callHistoryModel.countDocuments({
-                    agentId,
-                    direction: "inbound",
-                    ...date_to_check
-                });
+                const inboundAgent = check_user.agents.find(agent => agent.type === "inbound")?.agentId;
+                let inboundCalls = 0;
 
+                if (inboundAgent) {
+                    inboundCalls = await callHistoryModel.countDocuments({
+                        agentId: inboundAgent,
+                        direction: "inbound",
+                        ...date_to_check
+                    });
+                };
+                
                 voiceData = {
                     answeredCalls,
                     callDurationInMs: stats[0]?.totalCallDuration || 0,
