@@ -1,5 +1,5 @@
 import RootService from "../_root";
-import { Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express";
 import { AuthRequest } from "../../middleware/authRequest";
 import callHistoryModel from "../../models/historyModel";
 import { VoiceKPISchema, DashboardSchema, CallHistorySchema } from "../../validations/client/voice_data";
@@ -13,7 +13,7 @@ import { date } from "joi";
 import { DailyStatsModel } from "../../models/logModel";
 import { AutomatedResponses, convertMsToMinSec, DateFilterObjects } from "../../utils/client";
 import { calloutcome } from "../../utils/types";
-
+import fs from "fs";
 
 class VoiceDataService extends RootService {
     async voice_kpi(req: AuthRequest, res: Response, next: NextFunction) {
@@ -641,7 +641,7 @@ class VoiceDataService extends RootService {
                 const calledTimes = lead?.calledTimes || 0;
                 const lastCalled = lead?.datesCalled[0] || "";
                 const timestamp = history.startTimestamp || 0;
-                const time = DateTime.fromMillis(timestamp).toFormat('dd/MM/yyyy HH:mm');
+                const time = DateTime.fromMillis(timestamp).toFormat('MM/dd/yyyy HH:mm');
                 const formattedDuration = history.durationMs ? (() => {
                     const durationParts = typeof history?.durationMs === "string" ? history.durationMs.split(":") : ["00", "00", "00"];
                     return `${durationParts[1]}:${durationParts[2]}`;
