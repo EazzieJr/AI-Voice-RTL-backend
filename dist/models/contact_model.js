@@ -104,6 +104,9 @@ const ContactSchema = new mongoose_1.Schema({
     },
     creditEstimate: {
         type: String
+    },
+    companyname: {
+        type: String
     }
 }, { timestamps: true });
 const jobschema = new mongoose_1.Schema({

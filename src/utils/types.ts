@@ -48,7 +48,8 @@ export interface IContact {
   sid?: string,
   oid?: string,
   employmentStatus?: string,
-  creditEstimate?: string
+  creditEstimate?: string,
+  companyname?: string
 }
 
 export enum DaysToBeProcessedEnum{

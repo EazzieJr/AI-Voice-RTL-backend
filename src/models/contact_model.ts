@@ -105,6 +105,9 @@ const ContactSchema = new Schema<IContact>(
     },
     creditEstimate: {
       type: String
+    },
+    companyname: {
+      type: String
     }
   },
   { timestamps: true },
