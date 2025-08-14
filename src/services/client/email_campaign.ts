@@ -2,10 +2,11 @@ import RootService from "../_root";
 import { Response, NextFunction } from "express";
 import { AuthRequest } from "../../middleware/authRequest";
 import axios from "axios";
-import { CampaignDetailsAndEmailReachSchema } from "../../validations/client/email_campaign";
+import { CampaignDetailsAndEmailReachSchema, FetchRepliesSchema } from "../../validations/client/email_campaign";
 import { userModel } from "../../models/userModel";
 import { GetMonthRangeDates, GetWeekRangeDates } from "../../utils/dateQuery";
 import { toZonedTime } from "date-fns-tz";
+import { ReplyModel } from "../../models/emailReply";
 
 
 class EmailCampaignService extends RootService {
@@ -199,6 +200,113 @@ class EmailCampaignService extends RootService {
         };
     };
 
+    async fetch_replies(request: AuthRequest, response: Response, next: NextFunction) {
+        try {
+            const clientId = request.user._id;
+            const body = request.body;
+
+            const { error } = FetchRepliesSchema.validate(body, { abortEarly: false });
+            if (error) return this.handle_validation_errors(error, response, next);
+
+            const check_user = await userModel.findById(clientId);
+            if (!check_user) return response.status(400).json({ error: "User not found" });
+
+            const page = parseInt(body.page as string) || 1;
+            const campaign_id = body.campaignId as string;
+            const category = body.category as string[];
+
+            const { name } = check_user;
+
+            // Fetch data from two apiKeys instead of one
+            const apiKeys = [
+                process.env.SMART_LEAD_API_KEY,
+                process.env.SMART_LEAD_API_KEY_2
+            ].filter(Boolean);
+
+            const clients_urls = apiKeys.map(
+                key => `${process.env.SMART_LEAD_URL}/client/?api_key=${key}`
+            );
+
+            const clients_data = (await Promise.all(clients_urls.map(async url => {
+                const data_response = await axios.get(url);
+                return data_response.data;
+            }))).flat();
+
+            console.log("Fetched clients data: ", clients_data);
+
+            interface ClientObject {
+                id: number,
+                name: string,
+                email: string,
+                uuid: string,
+                created_at: string,
+                user_id: number,
+                logo: string,
+                logo_url: any,
+                client_permision: object[]
+            };
+
+            let foundClients: ClientObject[] = [];
+            let query: { [key: string]: any } = {};
+
+            if (name === "Legacy Alliance Club") {
+                const clients = clients_data.filter((client: ClientObject) => client.logo === "Digital Mavericks Media");
+                foundClients.push(...clients);
+            } else if (name === "ClearPath") {
+                const clients = clients_data.filter((client: ClientObject) => client.logo === "ClearPath CFO Advisors");
+                foundClients.push(...clients);
+            } else {
+                const clients = clients_data.filter((client: ClientObject) => client.logo === name);
+                foundClients.push(...clients);
+            };
+
+            if (foundClients.length < 1) return response.status(404).json({ error: "No clients found" });
+
+            const ids = foundClients.map(client => client.id);
+
+            const limit = 50;
+            const skip = (page - 1) * limit;
+
+            query.client_id = { $in: ids };
+            if (campaign_id) {
+                query.campaign_id = campaign_id;
+            };
+
+            if (category) {
+                query.reply_category = { $in: category };
+            };
+
+            const totalRecords = await ReplyModel.countDocuments(query);
+            const totalPages = Math.ceil(totalRecords / limit);
+
+            if (totalRecords < 1) {
+                return response.status(200).json({ result: [] });
+            };
+
+            if (page > totalPages) {
+                return response.status(404).json({ error: "Page exceeds available data" });
+            };
+
+            const replies = await ReplyModel
+                .find(query)
+                .sort({ event_timestamp: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean();
+
+            return response.status(200).json({
+                success: true,
+                result: replies,
+                page,
+                totalPages,
+                totalRecords
+            });
+
+        } catch (error) {
+            console.error("Error fetching campaign replies: " + error);
+            next(error);
+        };
+    }
 };
 
 export const email_campaign_service = new EmailCampaignService();
