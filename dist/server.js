@@ -1722,7 +1722,8 @@ class Server {
                 const clients = await userModel_1.userModel.aggregate([
                     {
                         $match: {
-                            group: { $in: clientsToReturn },
+                            name: { $nin: ["Admin", "lawal"] },
+                            agents: { $exists: true, $not: { $size: 0 } },
                         }
                     },
                     {
