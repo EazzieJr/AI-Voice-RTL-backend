@@ -9,8 +9,10 @@ const email_campaign_route_1 = __importDefault(require("./email_campaign.route")
 const voice_data_route_1 = __importDefault(require("./voice_data.route"));
 const profile_route_1 = __importDefault(require("./profile.route"));
 const webhook_route_1 = __importDefault(require("./webhook.route"));
+const admin_route_1 = __importDefault(require("./admin.route"));
 router.use("/", email_campaign_route_1.default);
 router.use("/", voice_data_route_1.default);
 router.use("/", profile_route_1.default);
 router.use("/", webhook_route_1.default);
+router.use("/admin", admin_route_1.default);
 exports.default = router;
