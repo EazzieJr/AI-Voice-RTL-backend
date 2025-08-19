@@ -170,7 +170,7 @@ const scheduleCronJob = async (scheduledTimePST, agentId, limit, fromNumber, for
                         // });
                     }
                     ;
-                    await new Promise((resolve) => setTimeout(resolve, 3000));
+                    await new Promise((resolve) => setTimeout(resolve, 10000));
                 }
                 ;
                 const update_status_to_called = await contact_model_1.jobModel.updateOne({ jobId }, {
