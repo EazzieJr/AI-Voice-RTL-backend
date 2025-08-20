@@ -265,10 +265,13 @@ export enum Category {
 export enum calloutcome {
   SUCCESS = "successful",
   FAILED = "unsuccessful",
+  CALL_BACK = "call_back",
+  VOICEMAIL = "voicemail",
   SCHEDULED = "appointment",
   TRANSFERRED = "call_transfer",
   DNC = "dnc",
   WRONG_NUMBER = "wrong_number",
+  UNKNOWN = "unknown"
 };
 
 export enum CampaignStatus {
@@ -285,4 +288,9 @@ export enum ClientType {
   VOICE = "voice",
   EMAIL = "email",
   INBOUND = "inbound",
+};
+
+export interface TranscriptContent {
+  Sentiment: string;
+  Outcome: string;
 };

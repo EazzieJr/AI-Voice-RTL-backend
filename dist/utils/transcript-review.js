@@ -85,7 +85,7 @@ Using phrases like "never call again" or "remove me from your database"
 ## TRANSCRIPT TO ANALYZE: ${transcript}
 ---
 ## OUTPUT FORMAT
-Return the result in the following format, with exactly one label for each:
+Return the result in a valid JSON format with no extra text, no explanations, no markdown formatting, with exactly one label for each:
 Sentiment: [Positive | Negative | Neutral | Unknown]
 Outcome: [Successful | Unsuccessful | Call Back | Voicemail | Scheduled | DNC | Unknown]`,
                 },
